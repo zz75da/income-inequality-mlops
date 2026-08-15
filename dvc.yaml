@@ -94,8 +94,7 @@ stages:
     outs:
       - data/artifacts/model_gini.pkl
     metrics:
-      - data/artifacts/metrics_gini.json:
-          cache: false
+      - data/artifacts/metrics_gini.json
 
   train_mobility:
     desc: "Random forest regressor -> intergen_income_elasticity"
@@ -108,8 +107,7 @@ stages:
     outs:
       - data/artifacts/model_mobility.pkl
     metrics:
-      - data/artifacts/metrics_mobility.json:
-          cache: false
+      - data/artifacts/metrics_mobility.json
 
   train_income_group:
     desc: "XGBoost classifier -> WB income_group (L/LM/UM/H), proxy for income bracket"
@@ -122,5 +120,4 @@ stages:
     outs:
       - data/artifacts/model_income_group.pkl
     metrics:
-      - data/artifacts/metrics_income_group.json:
-          cache: false
+      - data/artifacts/metrics_income_group.json

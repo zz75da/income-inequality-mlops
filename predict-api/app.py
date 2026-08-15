@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import pickle
 from pathlib import Path
 
@@ -84,8 +85,50 @@ class FeaturePayload(BaseModel):
         extra = "allow"  # tolerate extra fields without breaking
 
 
+def _try_dvc_pull_from_env() -> None:
+    """Cold-start bootstrap for a standalone hosted deploy (Render/Railway/
+    Fly.io/etc.) with no docker-compose volume mount for data/. Mirrors
+    streamlit/app_streamlit.py's _try_dvc_pull_from_secrets(), but reads
+    DAGSHUB_USER/DAGSHUB_TOKEN from the environment instead of st.secrets
+    (this service has no Streamlit-style secrets manager). Best-effort and
+    silent on failure — the existing per-model "not found" warnings already
+    cover that case. No-op when any model file already exists (the normal
+    docker-compose case), so this never runs an unnecessary dvc pull on
+    every /reload-artifacts call in local/dev use.
+    """
+    import subprocess
+
+    if any((ARTIFACTS_DIR / f"model_{name}.pkl").exists() for name in ("gini", "mobility", "income_group")):
+        return
+    user = os.getenv("DAGSHUB_USER")
+    token = os.getenv("DAGSHUB_TOKEN")
+    if not user or not token:
+        return
+
+    try:
+        subprocess.run(
+            ["dvc", "remote", "modify", "origin", "--local", "access_key_id", token],
+            cwd=str(ROOT),
+            check=True,
+            capture_output=True,
+            timeout=30,
+        )
+        subprocess.run(
+            ["dvc", "remote", "modify", "origin", "--local", "secret_access_key", token],
+            cwd=str(ROOT),
+            check=True,
+            capture_output=True,
+            timeout=30,
+        )
+        subprocess.run(["dvc", "pull"], cwd=str(ROOT), check=True, capture_output=True, timeout=120)
+        logger.info("dvc pull bootstrap succeeded")
+    except Exception:
+        logger.warning("dvc pull bootstrap failed", exc_info=True)
+
+
 def load_artifacts() -> None:
     global _models, _categorical_mappings, _feature_medians, _metrics
+    _try_dvc_pull_from_env()
     _models = {}
     _metrics = {}
     for name in ("gini", "mobility", "income_group"):
