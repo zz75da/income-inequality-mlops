@@ -32,6 +32,7 @@ def client(monkeypatch, import_service_app):
     monkeypatch.setattr(
         predict_app, "_categorical_mappings", {"region": {"Europe": 0}, "income_group_lag1": {"UNKNOWN": 0}}
     )
+    monkeypatch.setattr(predict_app, "_metrics", {"gini": {"residual_std": 5.0}, "mobility": {"residual_std": 0.1}})
     monkeypatch.setattr(predict_app, "record_prediction", lambda *a, **k: None)
 
     return TestClient(predict_app.app)
@@ -48,13 +49,17 @@ def test_health(client):
 def test_predict_gini(client):
     resp = client.post("/predict-gini", json={"gdp_per_capita_ppp": 30000, "region": "Europe"})
     assert resp.status_code == 200
-    assert resp.json() == {"gini_index": 42.0}
+    body = resp.json()
+    assert body["gini_index"] == 42.0
+    assert body["interval_80pct"] == pytest.approx([42.0 - 1.28 * 5.0, 42.0 + 1.28 * 5.0])
 
 
 def test_predict_mobility(client):
     resp = client.post("/predict-mobility", json={})
     assert resp.status_code == 200
-    assert resp.json() == {"intergen_income_elasticity": 42.0}
+    body = resp.json()
+    assert body["intergen_income_elasticity"] == 42.0
+    assert body["interval_80pct"] == pytest.approx([42.0 - 1.28 * 0.1, 42.0 + 1.28 * 0.1])
 
 
 def test_predict_income_group(client):
@@ -93,4 +98,4 @@ def test_predict_mobility_imputes_omitted_fields(monkeypatch, import_service_app
 
     resp = client.post("/predict-mobility", json={})  # every field omitted
     assert resp.status_code == 200
-    assert resp.json() == {"intergen_income_elasticity": 7.0}
+    assert resp.json() == {"intergen_income_elasticity": 7.0, "interval_80pct": None}

@@ -10,12 +10,13 @@
 # pandas .cat.codes internals).
 #
 # Endpoints:
-#   POST /predict-gini            -> {"gini_index": float}
-#   POST /predict-mobility        -> {"intergen_income_elasticity": float}
+#   POST /predict-gini            -> {"gini_index": float, "interval_80pct": [lo, hi]}
+#   POST /predict-mobility        -> {"intergen_income_elasticity": float, "interval_80pct": [lo, hi]}
 #   POST /predict-income-group    -> {"income_group": str, "probabilities": {...}}
 #   POST /reload-artifacts        (reload models from disk after a training run)
 #   GET  /drift-status
 #   POST /drift-trigger-report
+#   GET  /models/registry-status  (MLflow registry stage/version per target, if trained)
 #   GET  /health
 #   GET  /metrics
 # ============================================================
@@ -55,6 +56,7 @@ CATEGORICAL_FEATURES = PARAMS["features"]["categorical_features"]
 _models: dict = {}
 _categorical_mappings: dict = {}
 _feature_medians: dict = {}
+_metrics: dict = {}
 
 
 class FeaturePayload(BaseModel):
@@ -79,8 +81,9 @@ class FeaturePayload(BaseModel):
 
 
 def load_artifacts() -> None:
-    global _models, _categorical_mappings, _feature_medians
+    global _models, _categorical_mappings, _feature_medians, _metrics
     _models = {}
+    _metrics = {}
     for name in ("gini", "mobility", "income_group"):
         path = ARTIFACTS_DIR / f"model_{name}.pkl"
         if path.exists():
@@ -89,6 +92,11 @@ def load_artifacts() -> None:
             logger.info("Loaded model_%s.pkl", name)
         else:
             logger.warning("model_%s.pkl not found at %s — train it first via train-api", name, path)
+
+        metrics_path = ARTIFACTS_DIR / f"metrics_{name}.json"
+        if metrics_path.exists():
+            with open(metrics_path) as f:
+                _metrics[name] = json.load(f)
 
     mapping_path = ARTIFACTS_DIR / "categorical_mappings.json"
     if mapping_path.exists():
@@ -124,6 +132,19 @@ def _build_feature_row(payload: FeaturePayload) -> pd.DataFrame:
     return pd.DataFrame([row])
 
 
+def _interval_80pct(name: str, pred: float) -> list[float] | None:
+    """A fixed-width 80% prediction interval from the held-out test set's
+    residual std at training time (metrics_{name}.json's "residual_std").
+    Deliberately simple — one global band per target, not per-instance
+    heteroscedastic uncertainty (that would need quantile regression or a
+    conformal-prediction wrapper). None if the model predates this field."""
+    residual_std = _metrics.get(name, {}).get("residual_std")
+    if residual_std is None:
+        return None
+    half_width = 1.28 * residual_std  # ~80% two-tailed normal interval
+    return [pred - half_width, pred + half_width]
+
+
 @app.post("/predict-gini")
 def predict_gini(payload: FeaturePayload):
     if "gini" not in _models:
@@ -133,7 +154,7 @@ def predict_gini(payload: FeaturePayload):
         pred = float(_models["gini"].predict(X)[0])
         record_prediction(X.iloc[0].to_dict())
     PREDICTION_COUNT.labels(target="gini").inc()
-    return {"gini_index": pred}
+    return {"gini_index": pred, "interval_80pct": _interval_80pct("gini", pred)}
 
 
 @app.post("/predict-mobility")
@@ -145,7 +166,7 @@ def predict_mobility(payload: FeaturePayload):
         pred = float(_models["mobility"].predict(X)[0])
         record_prediction(X.iloc[0].to_dict())
     PREDICTION_COUNT.labels(target="mobility").inc()
-    return {"intergen_income_elasticity": pred}
+    return {"intergen_income_elasticity": pred, "interval_80pct": _interval_80pct("mobility", pred)}
 
 
 @app.post("/predict-income-group")
@@ -164,6 +185,19 @@ def predict_income_group(payload: FeaturePayload):
         "income_group": label_encoder.inverse_transform([pred_idx])[0],
         "probabilities": {cls: float(p) for cls, p in zip(label_encoder.classes_, proba, strict=False)},
     }
+
+
+@app.get("/models/registry-status")
+def models_registry_status():
+    """Per-target MLflow registry stage/version, as recorded by train-api's
+    register_and_promote() after each training run. Reads a plain JSON file
+    instead of querying MLflow directly — keeps this service's dependency
+    footprint (and its per-request latency/failure surface) unchanged."""
+    path = ARTIFACTS_DIR / "registry_status.json"
+    if not path.exists():
+        return {}
+    with open(path) as f:
+        return json.load(f)
 
 
 @app.post("/reload-artifacts")
