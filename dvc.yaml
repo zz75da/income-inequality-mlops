@@ -80,6 +80,7 @@ stages:
     outs:
       - data/processed/features.csv
       - data/artifacts/categorical_mappings.json
+      - data/artifacts/feature_medians.json
 
   train_gini:
     desc: "XGBoost regressor -> gini_index"

@@ -77,6 +77,19 @@ def main() -> None:
         panel[col] = panel.groupby("country_code")[col].transform(lambda s: s.fillna(s.median()))
         panel[col] = panel[col].fillna(panel[col].median())
 
+    # Global medians, persisted for predict-api to impute any numeric field a
+    # caller omits at inference time (e.g. RandomForestRegressor — unlike
+    # XGBoost — has no native NaN support and would otherwise 500). A column
+    # that ended up all-NaN above (a source that failed ingestion, e.g.
+    # WID.world) has no real median — fall back to 0.0 and say so.
+    feature_medians: dict[str, float] = {}
+    for col in feat_cfg["numeric_features"]:
+        median = panel[col].median()
+        if pd.isna(median):
+            logger.warning("%s has no non-null values at all — using 0.0 as its imputation fallback", col)
+            median = 0.0
+        feature_medians[col] = float(median)
+
     # Categorical encodings. The category -> code mapping is persisted to
     # data/artifacts/categorical_mappings.json so predict-api can encode a
     # single incoming request the exact same way training data was encoded
@@ -97,6 +110,11 @@ def main() -> None:
     with open(mappings_path, "w") as f:
         json.dump(mappings, f, indent=2)
     logger.info("Wrote categorical mappings -> %s", mappings_path)
+
+    medians_path = ARTIFACTS_DIR / "feature_medians.json"
+    with open(medians_path, "w") as f:
+        json.dump(feature_medians, f, indent=2)
+    logger.info("Wrote feature medians -> %s", medians_path)
 
     out_path = PROCESSED_DIR / "features.csv"
     panel.to_csv(out_path, index=False)

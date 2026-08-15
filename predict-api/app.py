@@ -54,6 +54,7 @@ CATEGORICAL_FEATURES = PARAMS["features"]["categorical_features"]
 
 _models: dict = {}
 _categorical_mappings: dict = {}
+_feature_medians: dict = {}
 
 
 class FeaturePayload(BaseModel):
@@ -78,7 +79,7 @@ class FeaturePayload(BaseModel):
 
 
 def load_artifacts() -> None:
-    global _models, _categorical_mappings
+    global _models, _categorical_mappings, _feature_medians
     _models = {}
     for name in ("gini", "mobility", "income_group"):
         path = ARTIFACTS_DIR / f"model_{name}.pkl"
@@ -97,6 +98,14 @@ def load_artifacts() -> None:
         logger.warning("categorical_mappings.json not found — categorical features will encode as -1 (unseen)")
         _categorical_mappings = {}
 
+    medians_path = ARTIFACTS_DIR / "feature_medians.json"
+    if medians_path.exists():
+        with open(medians_path) as f:
+            _feature_medians = json.load(f)
+    else:
+        logger.warning("feature_medians.json not found — a caller omitting a numeric field will fall back to 0.0")
+        _feature_medians = {}
+
 
 @app.on_event("startup")
 def startup_event():
@@ -106,7 +115,8 @@ def startup_event():
 def _build_feature_row(payload: FeaturePayload) -> pd.DataFrame:
     row: dict[str, float | int] = {}
     for col in NUMERIC_FEATURES:
-        row[col] = getattr(payload, col, None)
+        value = getattr(payload, col, None)
+        row[col] = value if value is not None else _feature_medians.get(col, 0.0)
     for col in CATEGORICAL_FEATURES:
         raw_value = getattr(payload, col, None) or "UNKNOWN"
         code = _categorical_mappings.get(col, {}).get(raw_value, -1)

@@ -72,3 +72,25 @@ def test_predict_gini_503_when_model_missing(monkeypatch, import_service_app):
     client = TestClient(predict_app.app)
     resp = client.post("/predict-gini", json={})
     assert resp.status_code == 503
+
+
+def test_predict_mobility_imputes_omitted_fields(monkeypatch, import_service_app):
+    """mobility uses RandomForestRegressor, which has no native NaN support —
+    a field a caller omits must be median-imputed before it ever reaches
+    .predict(), not passed through as NaN."""
+    predict_app = import_service_app("predict-api")
+
+    class NaNSensitiveRegressor:
+        def predict(self, X):
+            assert not X.isna().any().any(), "NaN reached the model — omitted fields weren't imputed"
+            return [7.0]
+
+    monkeypatch.setattr(predict_app, "_models", {"mobility": NaNSensitiveRegressor()})
+    monkeypatch.setattr(predict_app, "_categorical_mappings", {})
+    monkeypatch.setattr(predict_app, "_feature_medians", {"gdp_per_capita_ppp": 12345.0})
+    monkeypatch.setattr(predict_app, "record_prediction", lambda *a, **k: None)
+    client = TestClient(predict_app.app)
+
+    resp = client.post("/predict-mobility", json={})  # every field omitted
+    assert resp.status_code == 200
+    assert resp.json() == {"intergen_income_elasticity": 7.0}
