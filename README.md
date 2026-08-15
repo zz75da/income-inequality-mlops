@@ -6,16 +6,16 @@
 **Author:** [zz75da](https://github.com/zz75da)
 
 End-to-end MLOps platform predicting country-level income inequality from public macroeconomic data.
-Same technical stack family as [rakuten_mlops_services](https://github.com/zz75da/rakuten_z) (FastAPI
-microservices, Airflow, DVC/DagsHub, MLflow, Prometheus/Grafana), scoped down for a tabular,
-low-QPS, periodically-refreshed dataset instead of a high-throughput multimodal classifier.
+FastAPI microservices, Airflow orchestration, DVC/DagsHub data+model versioning, MLflow experiment
+tracking, and Prometheus/Grafana monitoring — scoped for a tabular, low-QPS, periodically-refreshed
+dataset rather than a high-throughput production simulation.
 
 ## Table of Contents
 
 - [Prediction Targets](#prediction-targets)
 - [Data Sources](#data-sources)
 - [Architecture](#architecture)
-- [Why This Differs From rakuten_mlops_services](#why-this-differs-from-rakuten_mlops_services)
+- [Design Scope](#design-scope)
 - [Quick Start](#quick-start)
 - [Service Endpoints](#service-endpoints)
 - [Repository Structure](#repository-structure)
@@ -76,26 +76,25 @@ Eurostat priority) into a single `gini_index` column.
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
-MLflow experiment tracking + model registry runs on DagsHub (same pattern as
-rakuten_mlops_services), not as a local container. DVC versions `data/raw` and `data/artifacts`
-against the same DagsHub S3-compatible remote.
+MLflow experiment tracking + model registry runs on DagsHub, not as a local container. DVC
+versions `data/raw` and `data/artifacts` against the same DagsHub S3-compatible remote.
 
-## Why This Differs From rakuten_mlops_services
+## Design Scope
 
-Rakuten's stack (85k-row multimodal text+image classification, 4 parallel text encoders,
-JWT gateway, K8s HPA proof-of-concept) was scoped for a high-throughput production simulation.
-This project's data is a few thousand country-year rows of tabular macro indicators refreshed
-on each source's own annual/biennial release calendar — copying that stack wholesale would add
-dead weight. What changed:
+This project's data is a few thousand country-year rows of tabular macro indicators, refreshed
+on each source's own annual/biennial release calendar — a fundamentally different shape from a
+high-throughput, high-QPS production workload, and the stack is scoped accordingly rather than
+over-built:
 
-- **Dropped:** `gate-api` JWT auth, `clip-encoder`/`minilm-encoder` microservices, OCR, GradCAM,
-  K8s manifests. No multi-encoder fan-out — one feature table feeds three simple sklearn/XGBoost
-  models.
-- **Kept as-is:** DVC + DagsHub, MLflow tracking, FastAPI train-api/predict-api split, Airflow
-  orchestration, Docker Compose, Prometheus/Grafana/Alertmanager, pytest unit+integration suites,
-  GitHub Actions CI.
-- **Retargeted:** Airflow runs `@monthly` instead of on-demand (matches source release cadence);
-  Evidently drift monitoring watches macro-feature drift instead of prediction-confidence drift.
+- **Kept deliberately simple:** one feature table feeds three sklearn/XGBoost models — no
+  multi-model fan-out, no GPU-bound encoders, no auth gateway (single-tenant demo scope).
+- **Full MLOps surface anyway:** DVC + DagsHub, MLflow tracking, FastAPI train-api/predict-api
+  split, Airflow orchestration, Docker Compose, Prometheus/Grafana/Alertmanager, pytest
+  unit+integration suites, GitHub Actions CI — none of that gets cut just because the data is small.
+- **Cadence matches the data, not a generic default:** Airflow runs `@monthly` instead of
+  on-demand, matching how often the underlying sources actually publish new figures; Evidently
+  drift monitoring watches macro-feature drift rather than prediction-confidence drift, since
+  that's the more meaningful signal for a slowly-refreshed macro panel.
 
 ## Quick Start
 
