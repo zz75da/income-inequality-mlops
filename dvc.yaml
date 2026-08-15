@@ -55,8 +55,7 @@ stages:
     deps:
       - ingestion/ingest_gdim.py
     outs:
-      - data/raw/gdim_mobility.csv:
-          required: false
+      - data/raw/gdim_mobility.csv
 
   merge_sources:
     desc: "Join all raw sources into a country-year panel, coalescing Gini variants"

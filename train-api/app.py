@@ -75,16 +75,19 @@ def _run_job(job_id: str, target: str, run_ingestion: bool) -> None:
     try:
         JOBS[job_id]["status"] = "running"
         if run_ingestion:
+            # ingest_gdim.py and ingest_wid.py degrade to writing an empty CSV (exit 0)
+            # instead of failing when their source is unavailable — see their docstrings.
             for script in INGEST_SCRIPTS:
                 ok = _run_script(script, job_id)
-                if not ok and script.name not in ("ingest_gdim.py", "ingest_wid.py"):  # GDIM needs a manual file; WID's public API is best-effort (see ingest_wid.py docstring)
+                if not ok:
                     raise RuntimeError(f"{script.name} failed — see log")
 
+        # Run every requested target even if one fails (e.g. mobility with no GDIM
+        # data loaded yet) so an unrelated target isn't blocked from training.
         targets = list(TARGET_SCRIPTS) if target == "all" else [target]
-        for t in targets:
-            ok = _run_script(TARGET_SCRIPTS[t], job_id)
-            if not ok:
-                raise RuntimeError(f"train_{t}.py failed — see log")
+        failed = [t for t in targets if not _run_script(TARGET_SCRIPTS[t], job_id)]
+        if failed:
+            raise RuntimeError(f"{', '.join(f'train_{t}.py' for t in failed)} failed — see log")
 
         JOBS[job_id]["status"] = "success"
     except Exception as exc:

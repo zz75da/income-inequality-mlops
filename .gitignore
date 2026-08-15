@@ -26,6 +26,7 @@ mlruns/
 /data/raw.dvc
 .dvc/cache
 .dvc/tmp
+.dvc/config.local
 
 # Airflow
 airflow/logs/

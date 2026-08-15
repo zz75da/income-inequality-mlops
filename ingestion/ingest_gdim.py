@@ -36,6 +36,7 @@ from common import RAW_DIR
 logger = logging.getLogger("ingestion.gdim")
 
 MANUAL_FILE = RAW_DIR / "gdim_manual_download.xlsx"
+OUT_COLUMNS = ["country_code", "country_name", "intergen_income_elasticity", "intergen_rank_correlation"]
 
 COLUMN_MAP = {
     "wbcode": "country_code",
@@ -47,14 +48,16 @@ COLUMN_MAP = {
 
 
 def main() -> None:
+    out_path = RAW_DIR / "gdim_mobility.csv"
     if not MANUAL_FILE.exists():
         logger.warning(
             "GDIM file not found at %s — download it manually from "
             "https://www.worldbank.org/en/topic/poverty/brief/global-database-on-intergenerational-mobility "
-            "and re-run this script. Skipping mobility target for now (merge_sources.py "
+            "and re-run this script. Writing an empty %s for now (merge_sources.py "
             "will leave intergen_income_elasticity as NaN).",
-            MANUAL_FILE,
+            MANUAL_FILE, out_path,
         )
+        pd.DataFrame(columns=OUT_COLUMNS).to_csv(out_path, index=False)
         return
 
     df = pd.read_excel(MANUAL_FILE)
@@ -72,9 +75,8 @@ def main() -> None:
     if "birth_cohort" in df.columns:
         df = df.sort_values("birth_cohort").groupby("country_code", as_index=False).last()
 
-    out_cols = [c for c in ["country_code", "country_name", "intergen_income_elasticity", "intergen_rank_correlation"] if c in df.columns]
+    out_cols = [c for c in OUT_COLUMNS if c in df.columns]
     out = df[out_cols].dropna(subset=["country_code"])
-    out_path = RAW_DIR / "gdim_mobility.csv"
     out.to_csv(out_path, index=False)
     logger.info("Wrote %d rows -> %s", len(out), out_path)
 

@@ -37,7 +37,7 @@ import os
 import pandas as pd
 import pycountry
 
-from common import get_with_retry, write_long_csv
+from common import LONG_COLUMNS, get_with_retry, write_long_csv
 
 logger = logging.getLogger("ingestion.wid")
 
@@ -93,8 +93,18 @@ def fetch_percentile(perc_code: str, feature_name: str) -> pd.DataFrame:
 
 
 def main() -> None:
-    frames = [fetch_percentile(code, name) for code, name in PERCENTILES.items()]
-    long_df = pd.concat(frames, ignore_index=True)
+    try:
+        frames = [fetch_percentile(code, name) for code, name in PERCENTILES.items()]
+        long_df = pd.concat(frames, ignore_index=True)
+    except Exception:
+        logger.warning(
+            "WID.world fetch failed — writing an empty data/raw/wid.csv so the rest of the "
+            "pipeline (merge_sources.py, dvc repro) can proceed. top10_income_share/"
+            "bottom50_income_share will be median-imputed. See the module docstring for why "
+            "this is currently expected.",
+            exc_info=True,
+        )
+        long_df = pd.DataFrame(columns=LONG_COLUMNS)
     write_long_csv(long_df, "wid")
 
 
