@@ -222,7 +222,7 @@ stages:
     outs:
     - path: data/artifacts/metrics_mobility.json
       hash: md5
-      md5: 026ad2365f44ba77542f37296aa9d88a
+      md5: 8c2b6d6797b322e897bf2da748d5be56
       size: 136
     - path: data/artifacts/model_mobility.pkl
       hash: md5
