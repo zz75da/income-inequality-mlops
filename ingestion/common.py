@@ -9,13 +9,9 @@ long-format CSV to data/raw/<source>.csv with the columns:
 merge_sources.py pivots and joins these into the wide feature table consumed
 by features/build_features.py.
 
-Note on connectivity: this sandbox environment cannot reach external hosts
-(api.worldbank.org, sdmx.oecd.org, ec.europa.eu, wid.world are all outside the
-network allowlist here), so these scripts are written against each source's
-documented, stable public API contract but have not been executed end-to-end
-in this environment. Run them from your own machine / CI, where they should
-work as-is; if an API shape has drifted since this was written, the error
-messages below point at exactly which request failed.
+Verified end-to-end against the live APIs (2026-08) — see the README's
+Known Limitations for the couple of source-specific gaps that turned up
+(WID.world's public API being retired, Eurostat's non-ISO3 country codes).
 """
 
 from __future__ import annotations
@@ -25,6 +21,7 @@ import time
 from pathlib import Path
 
 import pandas as pd
+import pycountry
 import requests
 
 RAW_DIR = Path(__file__).resolve().parent.parent / "data" / "raw"
@@ -51,6 +48,26 @@ def get_with_retry(
             logger.warning("GET %s failed (attempt %d/%d): %s", url, attempt, max_retries, exc)
             time.sleep(backoff**attempt)
     raise RuntimeError(f"GET {url} failed after {max_retries} attempts") from last_exc
+
+
+def iso2_to_iso3(code: str, overrides: dict[str, str] | None = None) -> str | None:
+    """Convert an ISO 3166-1 alpha-2 country code to alpha-3 via pycountry, so
+    every source can join on the same country_code key.
+
+    `overrides` covers codes a source uses that aren't standard ISO alpha-2 in
+    the first place — e.g. Eurostat's `geo` dimension uses "EL" for Greece and
+    "UK" for the United Kingdom instead of the real ISO codes "GR"/"GB".
+    Returns None for anything that doesn't map to a real country (regional
+    aggregates like WID's "QF" or Eurostat's "EU27_2020") — callers should
+    drop those rows rather than feed a fabricated code into the panel.
+    """
+    if overrides and code in overrides:
+        return overrides[code]
+    try:
+        country = pycountry.countries.get(alpha_2=code)
+        return country.alpha_3 if country else None
+    except (LookupError, AttributeError):
+        return None
 
 
 def write_long_csv(df: pd.DataFrame, source_name: str) -> Path:

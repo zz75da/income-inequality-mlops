@@ -1,6 +1,6 @@
 import pandas as pd
 import pytest
-from common import LONG_COLUMNS, write_long_csv
+from common import LONG_COLUMNS, iso2_to_iso3, write_long_csv
 
 
 def test_write_long_csv_happy_path(tmp_path, monkeypatch):
@@ -47,3 +47,24 @@ def test_write_long_csv_drops_null_values(tmp_path, monkeypatch):
     out_path = write_long_csv(df, "worldbank")
     result = pd.read_csv(out_path)
     assert len(result) == 1
+
+
+def test_iso2_to_iso3_standard_codes():
+    assert iso2_to_iso3("FR") == "FRA"
+    assert iso2_to_iso3("DE") == "DEU"
+
+
+def test_iso2_to_iso3_applies_overrides():
+    # Eurostat uses "EL"/"UK" instead of the real ISO codes "GR"/"GB" for
+    # Greece/the United Kingdom — this bit Eurostat ingestion for real: those
+    # rows silently failed to join against World Bank/OECD/WID's ISO3 keys
+    # until this override was added.
+    overrides = {"EL": "GRC", "UK": "GBR"}
+    assert iso2_to_iso3("EL", overrides=overrides) == "GRC"
+    assert iso2_to_iso3("UK", overrides=overrides) == "GBR"
+    assert iso2_to_iso3("EL") is None  # not a real ISO alpha-2 code without the override
+
+
+def test_iso2_to_iso3_returns_none_for_aggregates():
+    assert iso2_to_iso3("EU27_2020") is None
+    assert iso2_to_iso3("EA20") is None

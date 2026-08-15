@@ -37,7 +37,7 @@ import os
 
 import pandas as pd
 import pycountry
-from common import LONG_COLUMNS, get_with_retry, write_long_csv
+from common import LONG_COLUMNS, get_with_retry, iso2_to_iso3, write_long_csv
 
 logger = logging.getLogger("ingestion.wid")
 
@@ -46,14 +46,6 @@ INDICATOR = "sptinc992j"
 PERCENTILES = {"p90p100": "top10_income_share", "p0p50": "bottom50_income_share"}
 START_YEAR = 1990
 END_YEAR = 2024
-
-
-def iso2_to_iso3(iso2: str) -> str | None:
-    try:
-        country = pycountry.countries.get(alpha_2=iso2)
-        return country.alpha_3 if country else None
-    except (LookupError, AttributeError):
-        return None
 
 
 def fetch_percentile(perc_code: str, feature_name: str) -> pd.DataFrame:

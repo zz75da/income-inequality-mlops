@@ -16,6 +16,13 @@ of-poverty rate) and substitutes the World Bank's income-group classification
 (see ingest_worldbank.py) for the "individual income bracket" style
 classification target, rather than a genuinely per-household bracket, which
 would require that restricted microdata.
+
+Eurostat's `geo` dimension is mostly ISO 3166-1 alpha-2, but not entirely:
+"EL" for Greece and "UK" for the United Kingdom instead of the real ISO codes
+"GR"/"GB", plus supra-national aggregates like "EU27_2020"/"EA20" that aren't
+countries at all. Converted to ISO3 via common.iso2_to_iso3() (with those two
+overrides) so this joins correctly against World Bank/OECD/WID's ISO3 keys in
+merge_sources.py — rows that don't map to a real country are dropped.
 """
 
 from __future__ import annotations
@@ -23,7 +30,7 @@ from __future__ import annotations
 import logging
 
 import pandas as pd
-from common import get_with_retry, write_long_csv
+from common import get_with_retry, iso2_to_iso3, write_long_csv
 
 logger = logging.getLogger("ingestion.eurostat")
 
@@ -34,6 +41,9 @@ DATASETS = {
     "ilc_di11": "income_quintile_share_ratio",  # S80/S20 ratio
     "ilc_li02": "at_risk_of_poverty_rate",
 }
+
+# Eurostat-specific deviations from real ISO 3166-1 alpha-2 codes.
+GEO_OVERRIDES = {"EL": "GRC", "UK": "GBR"}
 
 
 def jsonstat_to_df(payload: dict, value_name: str) -> pd.DataFrame:
@@ -98,6 +108,23 @@ def fetch_dataset(dataset_code: str, value_name: str) -> pd.DataFrame:
     df = df.rename(columns={"geo": "country_code", "geo_label": "country_name", "time": "year"})
     keep = [c for c in ["country_code", "country_name", "year", "value"] if c in df.columns]
     df = df[keep].copy()
+
+    # Eurostat's raw geo codes (mostly ISO2, a couple of overrides, some
+    # supra-national aggregates that aren't real countries) -> ISO3, so this
+    # joins correctly against World Bank/OECD/WID in merge_sources.py.
+    raw_geo_codes = df["country_code"].unique()
+    n_before = len(df)
+    df["country_code"] = df["country_code"].map(lambda c: iso2_to_iso3(c, overrides=GEO_OVERRIDES))
+    dropped_codes = sorted({c for c in raw_geo_codes if pd.isna(iso2_to_iso3(c, overrides=GEO_OVERRIDES))})
+    df = df.dropna(subset=["country_code"])
+    if dropped_codes:
+        logger.info(
+            "eurostat/%s: dropped %d row(s) for non-ISO3-mappable geo codes (aggregates, not countries): %s",
+            value_name,
+            n_before - len(df),
+            dropped_codes,
+        )
+
     df["year"] = pd.to_numeric(df["year"], errors="coerce").astype("Int64")
     df["value"] = pd.to_numeric(df["value"], errors="coerce")
     df["indicator"] = value_name
