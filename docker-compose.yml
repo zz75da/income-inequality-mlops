@@ -1,0 +1,227 @@
+services:
+  # === Postgres — Airflow metadata DB (MLflow tracking lives on DagsHub, same as rakuten_mlops_services) ===
+  postgres:
+    image: postgres:13
+    container_name: postgres
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - income_mlops_network
+
+  # === Airflow init (db migrate + create default user) ===
+  airflow-init:
+    image: apache/airflow:2.9.1-python3.11
+    container_name: airflow-init
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW__CORE__FERNET_KEY}
+      AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW__WEBSERVER__SECRET_KEY}
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      _PIP_ADDITIONAL_REQUIREMENTS: ""
+    entrypoint: /bin/bash
+    command: >
+      -c "airflow db migrate &&
+          airflow users create --username admin --password admin --firstname admin --lastname admin --role Admin --email admin@example.com || true"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/plugins:/opt/airflow/plugins
+    networks:
+      - income_mlops_network
+
+  # === Airflow webserver + scheduler ===
+  airflow:
+    image: apache/airflow:2.9.1-python3.11
+    container_name: airflow
+    depends_on:
+      postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW__CORE__FERNET_KEY}
+      AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW__WEBSERVER__SECRET_KEY}
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+      TRAIN_API_URL: http://train-api:5002
+      PREDICT_API_URL: http://predict-api:5003
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/plugins:/opt/airflow/plugins
+    command: >
+      bash -c "airflow webserver -p 8080 & airflow scheduler"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 15s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - income_mlops_network
+
+  # === train-api ===
+  train-api:
+    build:
+      context: .
+      dockerfile: train-api/Dockerfile
+    container_name: train-api
+    env_file:
+      - .env
+    environment:
+      MLFLOW_EXPERIMENT_NAME: income-inequality
+    volumes:
+      - ./data:/app/data
+      - ./params.yaml:/app/params.yaml:ro
+    ports:
+      - "5002:5002"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5002/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - income_mlops_network
+
+  # === predict-api ===
+  predict-api:
+    build:
+      context: .
+      dockerfile: predict-api/Dockerfile
+    container_name: predict-api
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./params.yaml:/app/params.yaml:ro
+    ports:
+      - "5003:5003"
+    depends_on:
+      - train-api
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5003/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+    networks:
+      - income_mlops_network
+
+  # === Streamlit dashboard ===
+  streamlit:
+    build:
+      context: .
+      dockerfile: streamlit/Dockerfile.streamlit
+    container_name: streamlit
+    environment:
+      - PREDICT_API_URL=http://predict-api:5003
+    volumes:
+      - ./data:/app/data:ro
+    ports:
+      - "8501:8501"
+    depends_on:
+      - predict-api
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8501 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - income_mlops_network
+
+  # === Prometheus ===
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/alert-rules.yml:/etc/prometheus/alert-rules.yml
+      - prometheus_data:/prometheus
+    command: >
+      --config.file=/etc/prometheus/prometheus.yml
+      --storage.tsdb.path=/prometheus
+      --web.enable-lifecycle
+    depends_on:
+      - predict-api
+      - train-api
+    restart: unless-stopped
+    networks:
+      - income_mlops_network
+
+  # === Grafana ===
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD:-admin}
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+    volumes:
+      - grafana_storage:/var/lib/grafana
+      - ./monitoring/grafana_dashboards:/var/lib/grafana/dashboards
+      - ./monitoring/grafana_provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    networks:
+      - income_mlops_network
+
+  # === Pushgateway (Airflow-triggered batch metrics, e.g. post-training accuracy) ===
+  pushgateway:
+    image: prom/pushgateway
+    container_name: pushgateway
+    ports:
+      - "9091:9091"
+    restart: unless-stopped
+    networks:
+      - income_mlops_network
+
+  # === Alertmanager ===
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+      - alertmanager_data:/alertmanager
+    command: --config.file=/etc/alertmanager/alertmanager.yml --storage.path=/alertmanager
+    restart: unless-stopped
+    networks:
+      - income_mlops_network
+
+networks:
+  income_mlops_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  prometheus_data:
+  grafana_storage:
+  alertmanager_data:

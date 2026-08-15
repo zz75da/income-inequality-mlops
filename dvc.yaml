@@ -1,0 +1,125 @@
+# DVC pipeline definition — displayed as a DAG on DagsHub.
+#
+# Ingestion stages hit external public APIs (see ingestion/*.py for each
+# source's docs) and are frozen by default (`dvc repro` won't force re-run
+# them just because their code changed) since they're rate-limited and slow;
+# run `dvc repro --force ingest_worldbank` etc. to refresh a given source, or
+# trigger the whole chain from the Airflow DAG (airflow/dags/income_pipeline_dag.py)
+# on its scheduled cadence.
+
+stages:
+  ingest_worldbank:
+    desc: "World Bank Open Data API -> Gini, macro indicators, income-group classification"
+    cmd: python ingestion/ingest_worldbank.py
+    deps:
+      - ingestion/ingest_worldbank.py
+      - ingestion/common.py
+    outs:
+      - data/raw/worldbank.csv
+      - data/raw/worldbank_income_group_current.csv
+    frozen: true
+
+  ingest_oecd:
+    desc: "OECD SDMX API -> Income Distribution Database Gini"
+    cmd: python ingestion/ingest_oecd.py
+    deps:
+      - ingestion/ingest_oecd.py
+      - ingestion/common.py
+    outs:
+      - data/raw/oecd.csv
+    frozen: true
+
+  ingest_eurostat:
+    desc: "Eurostat JSON-stat API -> Gini, S80/S20, at-risk-of-poverty rate"
+    cmd: python ingestion/ingest_eurostat.py
+    deps:
+      - ingestion/ingest_eurostat.py
+      - ingestion/common.py
+    outs:
+      - data/raw/eurostat.csv
+    frozen: true
+
+  ingest_wid:
+    desc: "WID.world API -> top10 / bottom50 pre-tax income shares"
+    cmd: python ingestion/ingest_wid.py
+    deps:
+      - ingestion/ingest_wid.py
+      - ingestion/common.py
+    outs:
+      - data/raw/wid.csv
+    frozen: true
+
+  ingest_gdim:
+    desc: "GDIM mobility data, normalized from a manually downloaded World Bank file"
+    cmd: python ingestion/ingest_gdim.py
+    deps:
+      - ingestion/ingest_gdim.py
+    outs:
+      - data/raw/gdim_mobility.csv:
+          required: false
+
+  merge_sources:
+    desc: "Join all raw sources into a country-year panel, coalescing Gini variants"
+    cmd: python ingestion/merge_sources.py
+    deps:
+      - ingestion/merge_sources.py
+      - data/raw/worldbank.csv
+      - data/raw/worldbank_income_group_current.csv
+      - data/raw/oecd.csv
+      - data/raw/eurostat.csv
+      - data/raw/wid.csv
+    outs:
+      - data/processed/merged_panel.csv
+
+  build_features:
+    desc: "Clean, impute and encode the merged panel into the model-ready feature table"
+    cmd: python features/build_features.py
+    deps:
+      - features/build_features.py
+      - data/processed/merged_panel.csv
+      - params.yaml
+    outs:
+      - data/processed/features.csv
+      - data/artifacts/categorical_mappings.json
+
+  train_gini:
+    desc: "XGBoost regressor -> gini_index"
+    cmd: python train-api/services/train_gini.py
+    deps:
+      - train-api/services/train_gini.py
+      - train-api/services/common.py
+      - data/processed/features.csv
+      - params.yaml
+    outs:
+      - data/artifacts/model_gini.pkl
+    metrics:
+      - data/artifacts/metrics_gini.json:
+          cache: false
+
+  train_mobility:
+    desc: "Random forest regressor -> intergen_income_elasticity"
+    cmd: python train-api/services/train_mobility.py
+    deps:
+      - train-api/services/train_mobility.py
+      - train-api/services/common.py
+      - data/processed/features.csv
+      - params.yaml
+    outs:
+      - data/artifacts/model_mobility.pkl
+    metrics:
+      - data/artifacts/metrics_mobility.json:
+          cache: false
+
+  train_income_group:
+    desc: "XGBoost classifier -> WB income_group (L/LM/UM/H), proxy for income bracket"
+    cmd: python train-api/services/train_income_group.py
+    deps:
+      - train-api/services/train_income_group.py
+      - train-api/services/common.py
+      - data/processed/features.csv
+      - params.yaml
+    outs:
+      - data/artifacts/model_income_group.pkl
+    metrics:
+      - data/artifacts/metrics_income_group.json:
+          cache: false

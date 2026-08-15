@@ -1,0 +1,37 @@
+{
+  "title": "Income Inequality MLOps",
+  "uid": "income-inequality-mlops",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Prediction request rate",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        { "expr": "sum(rate(prediction_total[5m])) by (target)", "legendFormat": "{{target}}" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Predict-api P95 latency",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        { "expr": "histogram_quantile(0.95, sum(rate(predict_request_latency_seconds_bucket[5m])) by (le, target))", "legendFormat": "{{target}}" }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "train-api up",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 8 },
+      "targets": [{ "expr": "up{job=\"train-api\"}" }]
+    },
+    {
+      "type": "stat",
+      "title": "predict-api up",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 8 },
+      "targets": [{ "expr": "up{job=\"predict-api\"}" }]
+    }
+  ]
+}

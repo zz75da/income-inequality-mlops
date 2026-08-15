@@ -1,0 +1,51 @@
+groups:
+  - name: service-health
+    rules:
+      - alert: TrainAPIDown
+        expr: up{job="train-api"} == 0
+        for: 3m
+        labels: {severity: critical}
+        annotations: {summary: "train-api has been down for 3+ minutes"}
+
+      - alert: PredictAPIDown
+        expr: up{job="predict-api"} == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations: {summary: "predict-api has been down for 2+ minutes"}
+
+  - name: model-quality
+    rules:
+      - alert: GiniModelR2Low
+        expr: model_final_r2{target="gini"} < 0.4
+        labels: {severity: warning}
+        annotations: {summary: "Gini regressor R2 dropped below 0.4 on the last training run"}
+
+      - alert: IncomeGroupAccuracyLow
+        expr: model_final_accuracy{target="income_group"} < 0.7
+        labels: {severity: warning}
+        annotations: {summary: "Income-group classifier accuracy dropped below 0.70 on the last training run"}
+
+  - name: prediction-drift
+    rules:
+      - alert: HighPredictionErrorRate
+        expr: |
+          sum(rate(http_requests_total{job=~"predict-api", status=~"5.."}[5m]))
+          /
+          sum(rate(http_requests_total{job=~"predict-api"}[5m])) > 0.1
+        for: 5m
+        labels: {severity: warning}
+        annotations: {summary: "predict-api 5xx ratio above 10% over 5 minutes"}
+
+      - alert: PredictionLatencyHigh
+        expr: histogram_quantile(0.95, sum(rate(predict_request_latency_seconds_bucket[5m])) by (le)) > 2
+        for: 5m
+        labels: {severity: warning}
+        annotations: {summary: "predict-api P95 latency above 2s"}
+
+  - name: resources
+    rules:
+      - alert: DiskSpaceLow
+        expr: node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"} < 0.1
+        for: 10m
+        labels: {severity: warning}
+        annotations: {summary: "Root filesystem below 10% free space"}

@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# Env / secrets
+.env
+.dagshub_tokens
+.aws/
+
+# Data (DVC-tracked, not committed to git directly)
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+data/artifacts/*
+!data/artifacts/.gitkeep
+data/feature_cache/*
+!data/feature_cache/.gitkeep
+mlruns/
+
+# DVC
+/data/raw.dvc
+.dvc/cache
+.dvc/tmp
+
+# Airflow
+airflow/logs/
+airflow-webserver.pid
+airflow.cfg
+logs/
+
+# Docker
+*.log
+
+# Streamlit
+streamlit/data/*
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/

@@ -1,0 +1,70 @@
+# =============================================================================
+# Income Inequality MLOps — Experiment Parameters
+# =============================================================================
+# Edit this file to run a new experiment. The DVC pipeline and train-api read
+# it at training time; MLflow logs every value automatically so each run is
+# one comparable experiment point in DagsHub -> Experiments.
+# =============================================================================
+
+data:
+  start_year: 1990
+  end_year: 2024
+  # Countries excluded for lack of reliable coverage across all 4 sources
+  min_years_required: 5   # a country needs >= N years of data to be kept after merge
+
+features:
+  # Macro features assembled from World Bank + OECD + Eurostat + WID
+  numeric_features:
+    - gdp_per_capita_ppp
+    - gdp_growth_pct
+    - unemployment_rate
+    - education_expenditure_pct_gdp
+    - social_spending_pct_gdp
+    - tax_revenue_pct_gdp
+    - urban_population_pct
+    - population_total
+    - top10_income_share      # WID
+    - bottom50_income_share   # WID
+  categorical_features:
+    - region
+    - income_group_lag1       # previous year's WB income group, as a feature (not the classification target)
+  target_gini: gini_index                    # World Bank / OECD SI.POV.GINI, regression
+  target_mobility: intergen_income_elasticity # WID/GDIM-derived, regression
+  target_income_group: income_group           # World Bank classification (L / LM / UM / H), classification
+
+split:
+  test_size: 0.2
+  random_seed: 42
+  # Grouped split by country so the same country never leaks between train/test
+  group_column: country_code
+
+model_gini:
+  algorithm: xgboost_regressor
+  n_estimators: 400
+  max_depth: 5
+  learning_rate: 0.05
+  subsample: 0.8
+  colsample_bytree: 0.8
+  reg_lambda: 1.0
+
+model_mobility:
+  algorithm: random_forest_regressor
+  n_estimators: 500
+  max_depth: 8
+  min_samples_leaf: 3
+
+model_income_group:
+  algorithm: xgboost_classifier
+  n_estimators: 300
+  max_depth: 4
+  learning_rate: 0.05
+  subsample: 0.8
+  colsample_bytree: 0.8
+
+train:
+  cv_folds: 5
+  early_stopping_rounds: 30
+
+monitoring:
+  drift_reference_min_rows: 100
+  drift_psi_threshold: 0.2   # population stability index alert threshold per feature
