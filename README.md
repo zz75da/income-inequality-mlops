@@ -1,6 +1,6 @@
 # Income Inequality MLOps Platform
 
-[![CI — Tests & DVC Sync](https://github.com/zz75da/income-inequality-mlops/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/zz75da/income-inequality-mlops/actions/workflows/ci.yml)
+[![CI — Tests & DVC Sync](https://github.com/zz75da/income-inequality-mlops/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/zz75da/income-inequality-mlops/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 **Author:** [zz75da](https://github.com/zz75da)

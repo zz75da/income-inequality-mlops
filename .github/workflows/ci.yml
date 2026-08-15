@@ -2,9 +2,9 @@ name: CI — Tests & DVC Sync
 
 on:
   push:
-    branches: [main, "experiment/**"]
+    branches: [main, master, "experiment/**"]
   pull_request:
-    branches: [main]
+    branches: [main, master]
   workflow_dispatch:
 
 jobs:
