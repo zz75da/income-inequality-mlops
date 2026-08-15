@@ -49,7 +49,7 @@ paid API keys required (WID.world has an optional free key that only raises rate
 | [OECD Income Distribution Database](https://data-explorer.oecd.org/vis?fs[0]=Topic,1%7CSociety%23SOC%23%7CInequality%23SOC_INE%23&df[id]=DSD_WISE_IDD%40DF_IDD) | Gini index (OECD member countries, alternate methodology) | Public SDMX API |
 | [WID.world](https://wid.world/data/) | Top-10% / bottom-50% pre-tax income shares | Public REST API (currently retired — best-effort, see limitations) |
 | [Eurostat EU-SILC](https://ec.europa.eu/eurostat/web/microdata/collections-research/european-union-statistics-on-income-and-living-conditions) | Gini, S80/S20 ratio, at-risk-of-poverty rate (aggregate indicators only — see limitations) | Public JSON-stat API |
-| World Bank GDIM | Intergenerational income elasticity | Manual download (no API) |
+| World Bank GDIM | Intergenerational mobility (education-based proxy) | Public file download (data catalog, no auth) |
 
 `ingestion/*.py` each document their exact request shape; `ingestion/merge_sources.py` joins
 them into one country-year panel, coalescing the three Gini variants (World Bank > OECD >
@@ -120,9 +120,6 @@ make features       # build_features.py
 dvc pull
 ```
 
-Note: `ingestion/ingest_gdim.py` requires manually downloading the World Bank's GDIM
-spreadsheet first (see the script's docstring) — everything else runs unattended.
-
 ### 3 — Train locally (optional — otherwise train-api does this)
 
 ```bash
@@ -187,7 +184,7 @@ income-inequality-mlops/
 │   ├── ingest_oecd.py               # OECD SDMX API (generic SDMX-JSON flattener)
 │   ├── ingest_eurostat.py           # Eurostat JSON-stat API
 │   ├── ingest_wid.py                # WID.world API
-│   ├── ingest_gdim.py               # GDIM (manual download, no public API)
+│   ├── ingest_gdim.py               # GDIM (auto-downloads from World Bank data catalog)
 │   └── merge_sources.py             # joins all sources -> merged_panel.csv
 ├── features/
 │   └── build_features.py            # clean/impute/encode -> features.csv + categorical_mappings.json
@@ -226,15 +223,20 @@ Airflow Fernet/secret keys, Grafana admin password, optional WID API key).
 - **WID.world's public REST API (`/api/v3.php`) has been retired** and returns 404 with no
   documented public replacement — the site and official R package now call a private,
   key-gated AWS API Gateway endpoint not obtainable through public signup. `ingest_wid.py` is
-  therefore treated as best-effort (like `ingest_gdim.py`): its failure doesn't abort a
-  training run, and `top10_income_share`/`bottom50_income_share` fall back to median
-  imputation when absent. See the script's docstring for details.
+  therefore treated as best-effort: its failure doesn't abort a training run, and
+  `top10_income_share`/`bottom50_income_share` fall back to median imputation when absent. See
+  the script's docstring for details.
 - **No true household income-bracket target.** EU-SILC microdata (individual/household rows)
   requires a restricted research-access agreement with Eurostat — it is not available through
   any free API. `income_group` (World Bank's Low/Lower-middle/Upper-middle/High classification)
   is used as the closest legitimately-obtainable "bracket" target instead.
-- **GDIM mobility data requires a one-time manual download** (no public API for it at all) —
-  see `ingestion/ingest_gdim.py`.
+- **GDIM mobility uses an education-based proxy, not true income mobility.** `ingest_gdim.py`
+  auto-downloads the public World Bank Data Catalog CSV (no manual step, no auth) and uses its
+  `BETA`/`COR` columns (intergenerational persistence/rank-correlation of years-of-schooling) as
+  the `intergen_income_elasticity`/`intergen_rank_correlation` features — there's no free dataset
+  with this country coverage using actual income. If the dataset's Data Catalog resource id ever
+  changes, the script falls back to `data/raw/gdim_manual_download.csv` if present, then degrades
+  to an empty output (same best-effort pattern as `ingest_wid.py`) rather than failing the job.
 - **World Bank income-group classification is a current snapshot, not a historical series** via
   the API; a true year-by-year series requires manually downloading the OGHIST spreadsheet
   (documented in `ingest_worldbank.py`).

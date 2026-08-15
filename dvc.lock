@@ -73,13 +73,13 @@ stages:
     deps:
     - path: ingestion/ingest_gdim.py
       hash: md5
-      md5: 076141ef28b9386749da079519deffb1
-      size: 3507
+      md5: 3ede33ec1cfef285edc61a5abf669844
+      size: 4721
     outs:
     - path: data/raw/gdim_mobility.csv
       hash: md5
-      md5: 46b8dffbcfd5c4141462ffe356f1acf9
-      size: 79
+      md5: 39ed3fe48199e85fb48d0ea851d99bc7
+      size: 5103
   merge_sources:
     cmd: python ingestion/merge_sources.py
     deps:
@@ -110,15 +110,15 @@ stages:
     outs:
     - path: data/processed/merged_panel.csv
       hash: md5
-      md5: 2e3c3bbb3c0322e3fb49f03e7d07d8e9
-      size: 1645350
+      md5: b0741ffd5fe3c8a982b212b16d089907
+      size: 1742825
   build_features:
     cmd: python features/build_features.py
     deps:
     - path: data/processed/merged_panel.csv
       hash: md5
-      md5: 2e3c3bbb3c0322e3fb49f03e7d07d8e9
-      size: 1645350
+      md5: b0741ffd5fe3c8a982b212b16d089907
+      size: 1742825
     - path: features/build_features.py
       hash: md5
       md5: 025dac3885bfe112e65860a278b34296
@@ -134,15 +134,15 @@ stages:
       size: 422
     - path: data/processed/features.csv
       hash: md5
-      md5: eddb7cf88a7056bcf8a8765cd2d937d1
-      size: 2116562
+      md5: 7a2cd990e16f3b63fe38a7b60451b2a6
+      size: 2214037
   train_gini:
     cmd: python train-api/services/train_gini.py
     deps:
     - path: data/processed/features.csv
       hash: md5
-      md5: eddb7cf88a7056bcf8a8765cd2d937d1
-      size: 2116562
+      md5: 7a2cd990e16f3b63fe38a7b60451b2a6
+      size: 2214037
     - path: params.yaml
       hash: md5
       md5: 4b4ae7c5497cd9d3cf53060228c752d3
@@ -169,8 +169,8 @@ stages:
     deps:
     - path: data/processed/features.csv
       hash: md5
-      md5: eddb7cf88a7056bcf8a8765cd2d937d1
-      size: 2116562
+      md5: 7a2cd990e16f3b63fe38a7b60451b2a6
+      size: 2214037
     - path: params.yaml
       hash: md5
       md5: 4b4ae7c5497cd9d3cf53060228c752d3
@@ -192,3 +192,31 @@ stages:
       hash: md5
       md5: ae271cf2971d7d97e1614b3a07d76cab
       size: 1348213
+  train_mobility:
+    cmd: python train-api/services/train_mobility.py
+    deps:
+    - path: data/processed/features.csv
+      hash: md5
+      md5: 7a2cd990e16f3b63fe38a7b60451b2a6
+      size: 2214037
+    - path: params.yaml
+      hash: md5
+      md5: 4b4ae7c5497cd9d3cf53060228c752d3
+      size: 2270
+    - path: train-api/services/common.py
+      hash: md5
+      md5: 8866cb195f39df0abdabbd20ccf6ca2f
+      size: 2725
+    - path: train-api/services/train_mobility.py
+      hash: md5
+      md5: 826e9f757849bf5604d3e347959668ac
+      size: 2224
+    outs:
+    - path: data/artifacts/metrics_mobility.json
+      hash: md5
+      md5: 7e105a3c011227fd020726bb47de9cab
+      size: 98
+    - path: data/artifacts/model_mobility.pkl
+      hash: md5
+      md5: 39bf8c437c95f8eb1e9efca4f48ad6c0
+      size: 8440041

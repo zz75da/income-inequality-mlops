@@ -50,7 +50,7 @@ stages:
     frozen: true
 
   ingest_gdim:
-    desc: "GDIM mobility data, normalized from a manually downloaded World Bank file"
+    desc: "GDIM mobility data, auto-downloaded from the World Bank data catalog"
     cmd: python ingestion/ingest_gdim.py
     deps:
       - ingestion/ingest_gdim.py

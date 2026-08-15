@@ -9,8 +9,8 @@ usefully (re-pulls return mostly unchanged data) between real upstream
 releases — cheap insurance against silently going stale, without needing to
 track each source's exact release calendar.
 
-Flow: call train-api's POST /train with run_ingestion=true (re-pulls all 4
-sources + GDIM if present, rebuilds features, retrains all 3 models), poll
+Flow: call train-api's POST /train with run_ingestion=true (re-pulls all 5
+sources including GDIM, rebuilds features, retrains all 3 models), poll
 GET /train/status/{id} until done, then hit predict-api's
 POST /reload-artifacts so the running inference service picks up the new
 models without a restart.
@@ -58,9 +58,9 @@ def trigger_and_wait_for_training(**context) -> None:
             return
         if status == "partial_success":
             # Some targets trained and were saved/logged to MLflow even though
-            # others failed (e.g. mobility with no GDIM data loaded) — still worth
+            # others failed (e.g. a transient upstream API outage) — still worth
             # reloading predict-api so the targets that DID train go live, instead
-            # of retrying/failing the whole DAG run every month over a known gap.
+            # of retrying/failing the whole DAG run over one target's bad luck.
             logger.warning("Training job %s partially succeeded: %s", job_id, status_resp.json())
             return
         if status == "failed":
