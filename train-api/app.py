@@ -12,7 +12,9 @@
 #   POST /train              {"target": "gini|mobility|income_group|all",
 #                              "run_ingestion": false}
 #                            -> 202 {"job_id": "...", "status": "running"} | 409 if busy
-#   GET  /train/status/{id}  -> {"status": "success|running|failed", "log": [...]}
+#   GET  /train/status/{id}  -> {"status": "success|running|partial_success|failed", "log": [...]}
+#                            partial_success = some targets trained (models saved +
+#                            logged to MLflow) even though others failed — see "error"
 #   GET  /health
 #   GET  /metrics            (Prometheus)
 # ============================================================
@@ -86,10 +88,17 @@ def _run_job(job_id: str, target: str, run_ingestion: bool) -> None:
         # data loaded yet) so an unrelated target isn't blocked from training.
         targets = list(TARGET_SCRIPTS) if target == "all" else [target]
         failed = [t for t in targets if not _run_script(TARGET_SCRIPTS[t], job_id)]
-        if failed:
-            raise RuntimeError(f"{', '.join(f'train_{t}.py' for t in failed)} failed — see log")
 
-        JOBS[job_id]["status"] = "success"
+        if not failed:
+            JOBS[job_id]["status"] = "success"
+        elif len(failed) < len(targets):
+            # Some targets trained fine (new models saved + logged to MLflow) even
+            # though others didn't — callers like the Airflow DAG should still treat
+            # this as progress (e.g. reload predict-api) rather than a total failure.
+            JOBS[job_id]["status"] = "partial_success"
+            JOBS[job_id]["error"] = f"{', '.join(f'train_{t}.py' for t in failed)} failed — see log"
+        else:
+            raise RuntimeError(f"{', '.join(f'train_{t}.py' for t in failed)} failed — see log")
     except Exception as exc:
         logger.exception("Training job %s failed", job_id)
         JOBS[job_id]["status"] = "failed"

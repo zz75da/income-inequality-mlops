@@ -56,6 +56,13 @@ def trigger_and_wait_for_training(**context) -> None:
         if status == "success":
             logger.info("Training job %s succeeded", job_id)
             return
+        if status == "partial_success":
+            # Some targets trained and were saved/logged to MLflow even though
+            # others failed (e.g. mobility with no GDIM data loaded) — still worth
+            # reloading predict-api so the targets that DID train go live, instead
+            # of retrying/failing the whole DAG run every month over a known gap.
+            logger.warning("Training job %s partially succeeded: %s", job_id, status_resp.json())
+            return
         if status == "failed":
             raise RuntimeError(f"Training job {job_id} failed: {status_resp.json()}")
         time.sleep(POLL_INTERVAL_SECONDS)
