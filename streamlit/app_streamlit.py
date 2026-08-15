@@ -20,6 +20,7 @@ Five pages:
 from __future__ import annotations
 
 import json
+import logging
 import os
 from pathlib import Path
 
@@ -68,8 +69,49 @@ TARGETS = {
 st.set_page_config(page_title="Income Inequality MLOps", layout="wide", page_icon="📊")
 
 
+def _try_dvc_pull_from_secrets() -> None:
+    """Cold-start bootstrap for a hosted deploy (e.g. Streamlit Community
+    Cloud): data/ is DVC-tracked, not committed, so a fresh checkout has no
+    features.csv. If DagsHub credentials are configured in the platform's
+    secrets manager, attempt a `dvc pull` before giving up — best-effort,
+    silent on failure (the caller's existing "run the pipeline first"
+    warning covers that case either way). No-op locally/in Docker, where
+    features.csv already exists and this is never reached.
+    """
+    import subprocess
+
+    try:
+        user = st.secrets.get("DAGSHUB_USER")
+        token = st.secrets.get("DAGSHUB_TOKEN")
+    except Exception:
+        return  # no st.secrets configured (e.g. local run without secrets.toml)
+    if not user or not token:
+        return
+
+    try:
+        subprocess.run(
+            ["dvc", "remote", "modify", "origin", "--local", "access_key_id", token],
+            cwd=str(ROOT),
+            check=True,
+            capture_output=True,
+            timeout=30,
+        )
+        subprocess.run(
+            ["dvc", "remote", "modify", "origin", "--local", "secret_access_key", token],
+            cwd=str(ROOT),
+            check=True,
+            capture_output=True,
+            timeout=30,
+        )
+        subprocess.run(["dvc", "pull"], cwd=str(ROOT), check=True, capture_output=True, timeout=120)
+    except Exception:
+        logging.getLogger("streamlit.bootstrap").warning("dvc pull bootstrap failed", exc_info=True)
+
+
 @st.cache_data(ttl=300)
 def load_features() -> pd.DataFrame | None:
+    if not FEATURES_PATH.exists():
+        _try_dvc_pull_from_secrets()
     if not FEATURES_PATH.exists():
         return None
     return pd.read_csv(FEATURES_PATH)
