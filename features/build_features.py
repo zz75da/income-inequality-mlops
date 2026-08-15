@@ -25,7 +25,9 @@ import logging
 from pathlib import Path
 
 import pandas as pd
+import pandera as pa
 import yaml
+from schema import build_schema
 
 ROOT = Path(__file__).resolve().parent.parent
 PROCESSED_DIR = ROOT / "data" / "processed"
@@ -40,12 +42,32 @@ def load_params() -> dict:
         return yaml.safe_load(f)
 
 
+def _validate_panel(panel: pd.DataFrame, start_year: int, end_year: int) -> pd.DataFrame:
+    """Schema-check the merged panel and drop only the rows that fail — same
+    degrade-gracefully pattern already used for missing data sources
+    elsewhere in this pipeline (log + continue, don't abort the whole run
+    over a handful of bad rows)."""
+    schema = build_schema(start_year, end_year)
+    try:
+        schema.validate(panel, lazy=True)
+        return panel
+    except pa.errors.SchemaErrors as exc:
+        bad_indices = set(exc.failure_cases["index"].dropna().astype(int))
+        logger.warning(
+            "%d row(s) failed schema validation and will be dropped — see failure detail below:\n%s",
+            len(bad_indices),
+            exc.failure_cases.to_string(),
+        )
+        return panel.drop(index=bad_indices).reset_index(drop=True)
+
+
 def main() -> None:
     params = load_params()
     data_cfg = params["data"]
     feat_cfg = params["features"]
 
     panel = pd.read_csv(PROCESSED_DIR / "merged_panel.csv")
+    panel = _validate_panel(panel, data_cfg["start_year"], data_cfg["end_year"])
     panel = panel[(panel["year"] >= data_cfg["start_year"]) & (panel["year"] <= data_cfg["end_year"])]
 
     counts = panel.groupby("country_code")["year"].nunique()

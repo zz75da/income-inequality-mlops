@@ -75,6 +75,7 @@ stages:
     cmd: python features/build_features.py
     deps:
       - features/build_features.py
+      - features/schema.py
       - data/processed/merged_panel.csv
       - params.yaml
     outs:

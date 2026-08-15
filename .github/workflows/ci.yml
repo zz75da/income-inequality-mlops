@@ -95,7 +95,8 @@ jobs:
             "scikit-learn==1.4.2" \
             "xgboost==2.0.3" \
             "pyyaml==6.0.1" \
-            "pycountry==24.6.1"
+            "pycountry==24.6.1" \
+            "pandera==0.19.3"
 
       - name: Install test dependencies
         run: pip install -r tests/requirements-test.txt

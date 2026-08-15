@@ -2,6 +2,7 @@ import json
 
 import build_features
 import pandas as pd
+import pytest
 import yaml
 
 
@@ -53,3 +54,42 @@ def test_build_features_drops_sparse_countries_and_imputes(tmp_path, monkeypatch
     assert mapping_path.exists()
     mappings = json.loads(mapping_path.read_text())
     assert "region" in mappings
+
+    medians_path = artifacts / "feature_medians.json"
+    assert medians_path.exists()
+    medians = json.loads(medians_path.read_text())
+    assert medians["gdp_per_capita_ppp"] == pytest.approx(41000.0)  # median of [40000, 42000]
+
+
+def test_build_features_drops_only_invalid_rows(tmp_path, monkeypatch):
+    """A schema-invalid row (bad year, out-of-range Gini) is dropped without
+    aborting the whole run, matching the pipeline's existing degrade-gracefully
+    pattern for missing data sources elsewhere."""
+    root = tmp_path
+    processed = root / "data" / "processed"
+    processed.mkdir(parents=True)
+    artifacts = root / "data" / "artifacts"
+
+    _write_params(root, min_years=1)
+
+    panel = pd.DataFrame(
+        {
+            "country_code": ["FRA", "FRA", "DEU"],
+            "year": [2015, 1800, 2016],  # 1800 is out of [2015, 2024] -> dropped
+            "gini_index": [30.0, 31.0, 250.0],  # 250 is out of [0, 100] -> dropped
+            "gdp_per_capita_ppp": [40000, 41000, 42000],
+            "region": ["Europe", "Europe", "Europe"],
+        }
+    )
+    panel.to_csv(processed / "merged_panel.csv", index=False)
+
+    monkeypatch.setattr(build_features, "ROOT", root)
+    monkeypatch.setattr(build_features, "PROCESSED_DIR", processed)
+    monkeypatch.setattr(build_features, "ARTIFACTS_DIR", artifacts)
+
+    build_features.main()
+
+    out = pd.read_csv(processed / "features.csv")
+    assert len(out) == 1
+    assert out.iloc[0]["country_code"] == "FRA"
+    assert out.iloc[0]["year"] == 2015
