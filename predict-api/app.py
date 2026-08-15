@@ -25,15 +25,14 @@ import json
 import logging
 import pickle
 from pathlib import Path
-from typing import Optional
 
+import numpy as np
 import pandas as pd
 import yaml
 from fastapi import FastAPI, HTTPException
 from prometheus_client import Counter, Histogram
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel
-
 from services.drift_monitor import buffer_size, record_prediction, reference_exists, trigger_report
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -60,19 +59,19 @@ _categorical_mappings: dict = {}
 class FeaturePayload(BaseModel):
     # Numeric macro features — all optional so a caller can supply a partial
     # set and let the model's own NaN handling / our median fallback apply.
-    gdp_per_capita_ppp: Optional[float] = None
-    gdp_growth_pct: Optional[float] = None
-    unemployment_rate: Optional[float] = None
-    education_expenditure_pct_gdp: Optional[float] = None
-    social_spending_pct_gdp: Optional[float] = None
-    tax_revenue_pct_gdp: Optional[float] = None
-    urban_population_pct: Optional[float] = None
-    population_total: Optional[float] = None
-    top10_income_share: Optional[float] = None
-    bottom50_income_share: Optional[float] = None
+    gdp_per_capita_ppp: float | None = None
+    gdp_growth_pct: float | None = None
+    unemployment_rate: float | None = None
+    education_expenditure_pct_gdp: float | None = None
+    social_spending_pct_gdp: float | None = None
+    tax_revenue_pct_gdp: float | None = None
+    urban_population_pct: float | None = None
+    population_total: float | None = None
+    top10_income_share: float | None = None
+    bottom50_income_share: float | None = None
     # Categorical
-    region: Optional[str] = None
-    income_group_lag1: Optional[str] = None
+    region: str | None = None
+    income_group_lag1: str | None = None
 
     class Config:
         extra = "allow"  # tolerate extra fields without breaking
@@ -147,13 +146,13 @@ def predict_income_group(payload: FeaturePayload):
     model, label_encoder = bundle["model"], bundle["label_encoder"]
     with PREDICTION_LATENCY.labels(target="income_group").time():
         X = _build_feature_row(payload)
-        proba = model.predict_proba(X)[0]
+        proba = np.asarray(model.predict_proba(X)[0])
         pred_idx = int(proba.argmax())
         record_prediction(X.iloc[0].to_dict())
     PREDICTION_COUNT.labels(target="income_group").inc()
     return {
         "income_group": label_encoder.inverse_transform([pred_idx])[0],
-        "probabilities": {cls: float(p) for cls, p in zip(label_encoder.classes_, proba)},
+        "probabilities": {cls: float(p) for cls, p in zip(label_encoder.classes_, proba, strict=False)},
     }
 
 
@@ -186,5 +185,12 @@ def health():
 def root():
     return {
         "status": "API up and running",
-        "endpoints": ["/predict-gini", "/predict-mobility", "/predict-income-group", "/reload-artifacts", "/drift-status", "/health"],
+        "endpoints": [
+            "/predict-gini",
+            "/predict-mobility",
+            "/predict-income-group",
+            "/reload-artifacts",
+            "/drift-status",
+            "/health",
+        ],
     }

@@ -17,6 +17,7 @@ Steps:
      train-api scripts pick their own X/y slices from params.yaml so this
      file is shared across all three targets.
 """
+
 from __future__ import annotations
 
 import json
@@ -51,14 +52,21 @@ def main() -> None:
     keep_countries = counts[counts >= data_cfg["min_years_required"]].index
     dropped = set(panel["country_code"].unique()) - set(keep_countries)
     if dropped:
-        logger.info("Dropping %d countries with < %d years of data: %s",
-                    len(dropped), data_cfg["min_years_required"], sorted(dropped)[:20])
+        logger.info(
+            "Dropping %d countries with < %d years of data: %s",
+            len(dropped),
+            data_cfg["min_years_required"],
+            sorted(dropped)[:20],
+        )
     panel = panel[panel["country_code"].isin(keep_countries)].copy()
 
     missing_numeric = set(feat_cfg["numeric_features"]) - set(panel.columns)
     if missing_numeric:
-        logger.warning("Configured numeric features not present in merged panel (upstream ingestion may have failed) — "
-                        "adding as all-NaN so downstream column selection doesn't KeyError: %s", missing_numeric)
+        logger.warning(
+            "Configured numeric features not present in merged panel (upstream ingestion may have failed) — "
+            "adding as all-NaN so downstream column selection doesn't KeyError: %s",
+            missing_numeric,
+        )
         for col in missing_numeric:
             panel[col] = pd.NA
 
@@ -84,6 +92,7 @@ def main() -> None:
         mappings[col] = code_map
         panel[col + "_code"] = panel[col].map(code_map)
 
+    ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
     mappings_path = ARTIFACTS_DIR / "categorical_mappings.json"
     with open(mappings_path, "w") as f:
         json.dump(mappings, f, indent=2)

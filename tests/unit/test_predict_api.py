@@ -3,8 +3,8 @@ from fastapi.testclient import TestClient
 
 
 @pytest.fixture
-def client(monkeypatch):
-    import app as predict_app
+def client(monkeypatch, import_service_app):
+    predict_app = import_service_app("predict-api")
 
     class DummyRegressor:
         def predict(self, X):
@@ -20,12 +20,18 @@ def client(monkeypatch):
         def inverse_transform(self, idx):
             return [self.classes_[idx[0]]]
 
-    monkeypatch.setattr(predict_app, "_models", {
-        "gini": DummyRegressor(),
-        "mobility": DummyRegressor(),
-        "income_group": {"model": DummyClassifier(), "label_encoder": DummyLabelEncoder()},
-    })
-    monkeypatch.setattr(predict_app, "_categorical_mappings", {"region": {"Europe": 0}, "income_group_lag1": {"UNKNOWN": 0}})
+    monkeypatch.setattr(
+        predict_app,
+        "_models",
+        {
+            "gini": DummyRegressor(),
+            "mobility": DummyRegressor(),
+            "income_group": {"model": DummyClassifier(), "label_encoder": DummyLabelEncoder()},
+        },
+    )
+    monkeypatch.setattr(
+        predict_app, "_categorical_mappings", {"region": {"Europe": 0}, "income_group_lag1": {"UNKNOWN": 0}}
+    )
     monkeypatch.setattr(predict_app, "record_prediction", lambda *a, **k: None)
 
     return TestClient(predict_app.app)
@@ -59,8 +65,8 @@ def test_predict_income_group(client):
     assert sum(body["probabilities"].values()) == pytest.approx(1.0)
 
 
-def test_predict_gini_503_when_model_missing(monkeypatch):
-    import app as predict_app
+def test_predict_gini_503_when_model_missing(monkeypatch, import_service_app):
+    predict_app = import_service_app("predict-api")
 
     monkeypatch.setattr(predict_app, "_models", {})
     client = TestClient(predict_app.app)

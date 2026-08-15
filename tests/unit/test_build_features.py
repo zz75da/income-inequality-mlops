@@ -1,9 +1,8 @@
 import json
 
+import build_features
 import pandas as pd
 import yaml
-
-import build_features
 
 
 def _write_params(root, min_years=2):

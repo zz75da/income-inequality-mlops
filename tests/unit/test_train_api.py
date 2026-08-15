@@ -5,8 +5,8 @@ from fastapi.testclient import TestClient
 
 
 @pytest.fixture
-def client(monkeypatch):
-    import app as train_app
+def client(monkeypatch, import_service_app):
+    train_app = import_service_app("train-api")
 
     monkeypatch.setattr(train_app, "JOBS", {})
     monkeypatch.setattr(train_app, "_ACTIVE_JOB", None)
