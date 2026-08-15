@@ -1,12 +1,12 @@
 """Train the Gini-index regressor (XGBoost) and log the run to MLflow."""
+
 from __future__ import annotations
 
 import logging
 
+from common import group_train_test_split, load_features, load_params, mlflow_setup, save_metrics, save_model
 from sklearn.metrics import mean_absolute_error, r2_score
 from xgboost import XGBRegressor
-
-from common import group_train_test_split, load_features, load_params, mlflow_setup, save_metrics, save_model
 
 logger = logging.getLogger("train.gini")
 TARGET = "gini_index"
@@ -41,9 +41,15 @@ def main() -> None:
             "n_train": len(X_train),
             "n_test": len(X_test),
         }
-        mlflow.log_metrics({k: v for k, v in metrics.items() if isinstance(v, (int, float))})
+        mlflow.log_metrics({k: v for k, v in metrics.items() if isinstance(v, int | float)})
         mlflow.sklearn.log_model(model, artifact_path="model_gini")
-        logger.info("gini_index — MAE=%.3f R2=%.3f (train=%d test=%d)", metrics["mae"], metrics["r2"], metrics["n_train"], metrics["n_test"])
+        logger.info(
+            "gini_index — MAE=%.3f R2=%.3f (train=%d test=%d)",
+            metrics["mae"],
+            metrics["r2"],
+            metrics["n_train"],
+            metrics["n_test"],
+        )
 
     save_model(model, NAME)
     save_metrics(metrics, NAME)

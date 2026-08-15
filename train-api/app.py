@@ -61,14 +61,20 @@ INGEST_SCRIPTS = [
 
 
 class TrainRequest(BaseModel):
-    target: str = "all"          # "gini" | "mobility" | "income_group" | "all"
+    target: str = "all"  # "gini" | "mobility" | "income_group" | "all"
     run_ingestion: bool = False  # re-pull data from all 4 sources + rebuild features first
 
 
 def _run_script(path: Path, job_id: str) -> bool:
     result = subprocess.run([sys.executable, str(path)], cwd=str(ROOT), capture_output=True, text=True)
-    JOBS[job_id]["log"].append({"script": str(path.relative_to(ROOT)), "returncode": result.returncode,
-                                 "stdout_tail": result.stdout[-2000:], "stderr_tail": result.stderr[-2000:]})
+    JOBS[job_id]["log"].append(
+        {
+            "script": str(path.relative_to(ROOT)),
+            "returncode": result.returncode,
+            "stdout_tail": result.stdout[-2000:],
+            "stderr_tail": result.stderr[-2000:],
+        }
+    )
     return result.returncode == 0
 
 

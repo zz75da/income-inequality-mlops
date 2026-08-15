@@ -16,12 +16,12 @@ Two request shapes are used:
         (https://datahelpdesk.worldbank.org/knowledgebase/articles/906519) —
         see `fetch_income_group_note()` below.
 """
+
 from __future__ import annotations
 
 import logging
 
 import pandas as pd
-
 from common import get_with_retry, write_long_csv
 
 logger = logging.getLogger("ingestion.worldbank")
@@ -35,7 +35,7 @@ INDICATORS = {
     "NY.GDP.MKTP.KD.ZG": "gdp_growth_pct",
     "SL.UEM.TOTL.ZS": "unemployment_rate",
     "SE.XPD.TOTL.GD.ZS": "education_expenditure_pct_gdp",
-    "GC.XPN.TOTL.GD.ZS": "social_spending_pct_gdp",     # govt expense % GDP, proxy for social spending
+    "GC.XPN.TOTL.GD.ZS": "social_spending_pct_gdp",  # govt expense % GDP, proxy for social spending
     "GC.TAX.TOTL.GD.ZS": "tax_revenue_pct_gdp",
     "SP.URB.TOTL.IN.ZS": "urban_population_pct",
     "SP.POP.TOTL": "population_total",

@@ -1,4 +1,5 @@
 """Shared helpers for the three train_*.py scripts (gini / mobility / income_group)."""
+
 from __future__ import annotations
 
 import json
@@ -27,8 +28,7 @@ def load_params() -> dict:
 def load_features() -> pd.DataFrame:
     if not FEATURES_PATH.exists():
         raise FileNotFoundError(
-            f"{FEATURES_PATH} not found. Run `make ingest && make features` "
-            "(or `dvc repro`) before training."
+            f"{FEATURES_PATH} not found. Run `make ingest && make features` " "(or `dvc repro`) before training."
         )
     return pd.read_csv(FEATURES_PATH)
 

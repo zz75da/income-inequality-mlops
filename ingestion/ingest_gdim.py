@@ -28,12 +28,12 @@ with this country coverage using actual income), so this is the same kind of
 documented proxy as `income_group` standing in for a true income bracket —
 see the README's Known Limitations.
 """
+
 from __future__ import annotations
 
 import logging
 
 import pandas as pd
-
 from common import RAW_DIR, get_with_retry
 
 logger = logging.getLogger("ingestion.gdim")
@@ -74,7 +74,9 @@ def main() -> None:
             "(merge_sources.py will leave intergen_income_elasticity as NaN). "
             "Check https://datacatalog.worldbank.org/search/dataset/0050771/ for a "
             "current download URL if this dataset has moved.",
-            MANUAL_FILE, out_path, exc_info=True,
+            MANUAL_FILE,
+            out_path,
+            exc_info=True,
         )
         pd.DataFrame(columns=OUT_COLUMNS).to_csv(out_path, index=False)
         return

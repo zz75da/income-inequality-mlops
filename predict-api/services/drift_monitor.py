@@ -6,12 +6,12 @@ buffers incoming feature rows, and once params.yaml's
 monitoring.drift_reference_min_rows is reached compares the buffer against a
 reference sample built from data/processed/features.csv at startup.
 """
+
 from __future__ import annotations
 
-import json
 import logging
 import threading
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
@@ -73,8 +73,8 @@ def trigger_report(feature_columns: list[str]) -> str | None:
         _buffer.clear()
 
     try:
-        from evidently.report import Report
         from evidently.metric_preset import DataDriftPreset
+        from evidently.report import Report
     except ImportError:
         logger.warning("evidently not installed — skipping drift report generation")
         return None
@@ -83,7 +83,7 @@ def trigger_report(feature_columns: list[str]) -> str | None:
     report = Report(metrics=[DataDriftPreset()])
     report.run(reference_data=reference[cols], current_data=current[cols])
 
-    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     out_path = REPORTS_DIR / f"drift_report_{ts}.html"
     report.save_html(str(out_path))
     _prune_old_reports()

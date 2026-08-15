@@ -23,12 +23,12 @@ includes a small generic SDMX-JSON -> long DataFrame flattener since that
 shape is common to every OECD dataflow (swap FILTER/DATAFLOW to reuse it for
 other OECD inequality series, e.g. wealth Gini, poverty rates).
 """
+
 from __future__ import annotations
 
 import logging
 
 import pandas as pd
-
 from common import get_with_retry, write_long_csv
 
 logger = logging.getLogger("ingestion.oecd")
@@ -49,13 +49,9 @@ def flatten_sdmx_json(payload: dict) -> pd.DataFrame:
     rows = []
     for series_key, series_val in dataset.get("series", {}).items():
         dim_indices = [int(i) for i in series_key.split(":")]
-        dim_values = {
-            dim["id"]: dim["values"][idx]["id"]
-            for dim, idx in zip(series_dims, dim_indices)
-        }
+        dim_values = {dim["id"]: dim["values"][idx]["id"] for dim, idx in zip(series_dims, dim_indices, strict=False)}
         dim_labels = {
-            dim["id"] + "_label": dim["values"][idx]["name"]
-            for dim, idx in zip(series_dims, dim_indices)
+            dim["id"] + "_label": dim["values"][idx]["name"] for dim, idx in zip(series_dims, dim_indices, strict=False)
         }
         for obs_key, obs_val in series_val.get("observations", {}).items():
             obs_index = int(obs_key.split(":")[0])
@@ -72,7 +68,9 @@ def fetch_gini() -> pd.DataFrame:
     resp = get_with_retry(url, params=params, headers={"Accept": "application/vnd.sdmx.data+json"})
     df = flatten_sdmx_json(resp.json())
     if df.empty:
-        logger.warning("OECD SDMX response parsed to 0 rows — check FILTER string against the current dataflow structure")
+        logger.warning(
+            "OECD SDMX response parsed to 0 rows — check FILTER string against the current dataflow structure"
+        )
         return df
 
     df = df.rename(columns={"REF_AREA": "country_code", "REF_AREA_label": "country_name"})

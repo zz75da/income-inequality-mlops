@@ -1,12 +1,12 @@
 """Train the intergenerational income mobility regressor (Random Forest)."""
+
 from __future__ import annotations
 
 import logging
 
+from common import group_train_test_split, load_features, load_params, mlflow_setup, save_metrics, save_model
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, r2_score
-
-from common import group_train_test_split, load_features, load_params, mlflow_setup, save_metrics, save_model
 
 logger = logging.getLogger("train.mobility")
 TARGET = "intergen_income_elasticity"
@@ -22,7 +22,8 @@ def main() -> None:
             "Only %d non-null rows for %s — GDIM data likely hasn't been loaded "
             "(see ingestion/ingest_gdim.py). Training will proceed on whatever rows exist, "
             "but results won't be meaningful until GDIM is loaded.",
-            df[TARGET].notna().sum(), TARGET,
+            df[TARGET].notna().sum(),
+            TARGET,
         )
 
     X_train, X_test, y_train, y_test = group_train_test_split(df, TARGET, params)
@@ -47,9 +48,15 @@ def main() -> None:
             "n_train": len(X_train),
             "n_test": len(X_test),
         }
-        mlflow.log_metrics({k: v for k, v in metrics.items() if isinstance(v, (int, float))})
+        mlflow.log_metrics({k: v for k, v in metrics.items() if isinstance(v, int | float)})
         mlflow.sklearn.log_model(model, artifact_path="model_mobility")
-        logger.info("intergen_income_elasticity — MAE=%.3f R2=%.3f (train=%d test=%d)", metrics["mae"], metrics["r2"], metrics["n_train"], metrics["n_test"])
+        logger.info(
+            "intergen_income_elasticity — MAE=%.3f R2=%.3f (train=%d test=%d)",
+            metrics["mae"],
+            metrics["r2"],
+            metrics["n_train"],
+            metrics["n_test"],
+        )
 
     save_model(model, NAME)
     save_metrics(metrics, NAME)

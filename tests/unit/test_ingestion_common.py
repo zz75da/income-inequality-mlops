@@ -1,6 +1,5 @@
 import pandas as pd
 import pytest
-
 from common import LONG_COLUMNS, write_long_csv
 
 

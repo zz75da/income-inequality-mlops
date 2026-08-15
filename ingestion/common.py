@@ -17,6 +17,7 @@ in this environment. Run them from your own machine / CI, where they should
 work as-is; if an API shape has drifted since this was written, the error
 messages below point at exactly which request failed.
 """
+
 from __future__ import annotations
 
 import logging
@@ -34,7 +35,9 @@ LONG_COLUMNS = ["country_code", "country_name", "year", "indicator", "value", "s
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 
 
-def get_with_retry(url: str, params: dict | None = None, max_retries: int = 3, backoff: float = 2.0, **kwargs) -> requests.Response:
+def get_with_retry(
+    url: str, params: dict | None = None, max_retries: int = 3, backoff: float = 2.0, **kwargs
+) -> requests.Response:
     """GET with simple exponential backoff — public stat APIs rate-limit aggressively."""
     logger = logging.getLogger("ingestion.http")
     last_exc = None
@@ -46,7 +49,7 @@ def get_with_retry(url: str, params: dict | None = None, max_retries: int = 3, b
         except requests.RequestException as exc:
             last_exc = exc
             logger.warning("GET %s failed (attempt %d/%d): %s", url, attempt, max_retries, exc)
-            time.sleep(backoff ** attempt)
+            time.sleep(backoff**attempt)
     raise RuntimeError(f"GET {url} failed after {max_retries} attempts") from last_exc
 
 

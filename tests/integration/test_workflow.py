@@ -4,6 +4,7 @@ verifying the full offline data pipeline wiring (not the live external APIs,
 which ingest_*.py scripts hit directly and which this sandbox/CI environment
 cannot reach — see ingestion/common.py's module docstring).
 """
+
 import pandas as pd
 import pytest
 import yaml
@@ -32,12 +33,22 @@ def test_merge_and_build_features_pipeline(tmp_path, monkeypatch):
         }
     )
     worldbank.to_csv(raw / "worldbank.csv", index=False)
-    pd.DataFrame(columns=["country_code", "country_name", "year", "indicator", "value", "source"]).to_csv(raw / "oecd.csv", index=False)
-    pd.DataFrame(columns=["country_code", "country_name", "year", "indicator", "value", "source"]).to_csv(raw / "eurostat.csv", index=False)
-    pd.DataFrame(columns=["country_code", "country_name", "year", "indicator", "value", "source"]).to_csv(raw / "wid.csv", index=False)
-    pd.DataFrame({"country_code": ["FRA", "USA"], "income_group": ["High income", "High income"], "region": ["Europe", "North America"]}).to_csv(
-        raw / "worldbank_income_group_current.csv", index=False
+    pd.DataFrame(columns=["country_code", "country_name", "year", "indicator", "value", "source"]).to_csv(
+        raw / "oecd.csv", index=False
     )
+    pd.DataFrame(columns=["country_code", "country_name", "year", "indicator", "value", "source"]).to_csv(
+        raw / "eurostat.csv", index=False
+    )
+    pd.DataFrame(columns=["country_code", "country_name", "year", "indicator", "value", "source"]).to_csv(
+        raw / "wid.csv", index=False
+    )
+    pd.DataFrame(
+        {
+            "country_code": ["FRA", "USA"],
+            "income_group": ["High income", "High income"],
+            "region": ["Europe", "North America"],
+        }
+    ).to_csv(raw / "worldbank_income_group_current.csv", index=False)
 
     monkeypatch.setattr(merge_sources, "RAW_DIR", raw)
     monkeypatch.setattr(merge_sources, "PROCESSED_DIR", processed)

@@ -12,6 +12,7 @@ won in `gini_source`, so the model can (optionally) use `gini_source` as a
 feature to account for methodological differences between the three Gini
 definitions.
 """
+
 from __future__ import annotations
 
 import logging
@@ -59,7 +60,9 @@ def main() -> None:
         gini_pivot["gini_source"] = gini_pivot[present].apply(
             lambda row: next((c for c in present if pd.notna(row[c])), None), axis=1
         )
-    wide = wide.merge(gini_pivot[["country_code", "year", "gini_index", "gini_source"]], on=["country_code", "year"], how="outer")
+    wide = wide.merge(
+        gini_pivot[["country_code", "year", "gini_index", "gini_source"]], on=["country_code", "year"], how="outer"
+    )
 
     # Country name lookup (prefer World Bank's naming).
     names = long_df.dropna(subset=["country_name"]).drop_duplicates("country_code")[["country_code", "country_name"]]
@@ -83,7 +86,10 @@ def main() -> None:
         gdim = pd.read_csv(gdim_path)[["country_code", "intergen_income_elasticity", "intergen_rank_correlation"]]
         wide = wide.merge(gdim, on="country_code", how="left")
     else:
-        logger.warning("%s not found — run ingestion/ingest_gdim.py after manually downloading GDIM. Mobility target will be all-NaN.", gdim_path)
+        logger.warning(
+            "%s not found — run ingestion/ingest_gdim.py after manually downloading GDIM. Mobility target will be all-NaN.",
+            gdim_path,
+        )
         wide["intergen_income_elasticity"] = pd.NA
         wide["intergen_rank_correlation"] = pd.NA
 

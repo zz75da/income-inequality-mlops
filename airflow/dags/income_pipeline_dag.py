@@ -15,6 +15,7 @@ GET /train/status/{id} until done, then hit predict-api's
 POST /reload-artifacts so the running inference service picks up the new
 models without a restart.
 """
+
 from __future__ import annotations
 
 import logging
@@ -23,6 +24,7 @@ import time
 from datetime import datetime, timedelta
 
 import requests
+
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 
@@ -87,7 +89,6 @@ with DAG(
     max_active_runs=1,
     tags=["income-inequality", "mlops"],
 ) as dag:
-
     train_task = PythonOperator(
         task_id="trigger_and_wait_for_training",
         python_callable=trigger_and_wait_for_training,

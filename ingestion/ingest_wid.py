@@ -29,6 +29,7 @@ per-country/global median imputation. If WID.world ever republishes a public
 CSV bulk-download or reinstates the v3 API, point API_URL at it and this
 script starts working again with no other changes needed.
 """
+
 from __future__ import annotations
 
 import logging
@@ -36,7 +37,6 @@ import os
 
 import pandas as pd
 import pycountry
-
 from common import LONG_COLUMNS, get_with_retry, write_long_csv
 
 logger = logging.getLogger("ingestion.wid")
@@ -89,7 +89,9 @@ def fetch_percentile(perc_code: str, feature_name: str) -> pd.DataFrame:
     )
     raw["year"] = pd.to_numeric(raw["year"], errors="coerce")
     raw["value"] = pd.to_numeric(raw["value"], errors="coerce")
-    return raw[["country_code", "country_name", "year", "indicator", "value", "source"]].dropna(subset=["year", "value"])
+    return raw[["country_code", "country_name", "year", "indicator", "value", "source"]].dropna(
+        subset=["year", "value"]
+    )
 
 
 def main() -> None:

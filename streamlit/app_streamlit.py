@@ -10,6 +10,7 @@ Three pages:
   - Drift Reports: lists and embeds the Evidently HTML reports predict-api
     has generated under data/artifacts/drift_reports/.
 """
+
 from __future__ import annotations
 
 import os
@@ -18,6 +19,7 @@ from pathlib import Path
 import pandas as pd
 import plotly.express as px
 import requests
+
 import streamlit as st
 
 PREDICT_API_URL = os.getenv("PREDICT_API_URL", "http://localhost:5003")
@@ -41,11 +43,19 @@ def page_explore(df: pd.DataFrame) -> None:
     latest = df.sort_values("year").groupby("country_code", as_index=False).last()
     metric = st.selectbox(
         "Metric",
-        [c for c in ["gini_index", "top10_income_share", "bottom50_income_share", "intergen_income_elasticity"] if c in latest.columns],
+        [
+            c
+            for c in ["gini_index", "top10_income_share", "bottom50_income_share", "intergen_income_elasticity"]
+            if c in latest.columns
+        ],
     )
     fig = px.choropleth(
-        latest, locations="country_code", color=metric, hover_name="country_name",
-        color_continuous_scale="RdYlGn_r", projection="natural earth",
+        latest,
+        locations="country_code",
+        color=metric,
+        hover_name="country_name",
+        color_continuous_scale="RdYlGn_r",
+        projection="natural earth",
         title=f"Latest {metric} by country",
     )
     st.plotly_chart(fig, use_container_width=True)
@@ -78,15 +88,23 @@ def page_predict() -> None:
         bottom50_income_share = st.number_input("Bottom 50% income share", value=0.15)
 
     region = st.text_input("Region", value="Europe & Central Asia")
-    income_group_lag1 = st.selectbox("Previous income group", ["Low income", "Lower middle income", "Upper middle income", "High income", "UNKNOWN"])
+    income_group_lag1 = st.selectbox(
+        "Previous income group", ["Low income", "Lower middle income", "Upper middle income", "High income", "UNKNOWN"]
+    )
 
     payload = dict(
-        gdp_per_capita_ppp=gdp_per_capita_ppp, gdp_growth_pct=gdp_growth_pct,
-        unemployment_rate=unemployment_rate, education_expenditure_pct_gdp=education_expenditure_pct_gdp,
-        social_spending_pct_gdp=social_spending_pct_gdp, tax_revenue_pct_gdp=tax_revenue_pct_gdp,
-        urban_population_pct=urban_population_pct, population_total=population_total,
-        top10_income_share=top10_income_share, bottom50_income_share=bottom50_income_share,
-        region=region, income_group_lag1=income_group_lag1,
+        gdp_per_capita_ppp=gdp_per_capita_ppp,
+        gdp_growth_pct=gdp_growth_pct,
+        unemployment_rate=unemployment_rate,
+        education_expenditure_pct_gdp=education_expenditure_pct_gdp,
+        social_spending_pct_gdp=social_spending_pct_gdp,
+        tax_revenue_pct_gdp=tax_revenue_pct_gdp,
+        urban_population_pct=urban_population_pct,
+        population_total=population_total,
+        top10_income_share=top10_income_share,
+        bottom50_income_share=bottom50_income_share,
+        region=region,
+        income_group_lag1=income_group_lag1,
     )
 
     if st.button("Predict all 3 targets"):
@@ -124,7 +142,9 @@ def main() -> None:
     if page == "Explore":
         df = load_features()
         if df is None:
-            st.warning("data/processed/features.csv not found — run the ingestion + feature pipeline first (`make ingest && make features`).")
+            st.warning(
+                "data/processed/features.csv not found — run the ingestion + feature pipeline first (`make ingest && make features`)."
+            )
         else:
             page_explore(df)
     elif page == "Predict":

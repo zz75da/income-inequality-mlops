@@ -17,12 +17,12 @@ of-poverty rate) and substitutes the World Bank's income-group classification
 classification target, rather than a genuinely per-household bracket, which
 would require that restricted microdata.
 """
+
 from __future__ import annotations
 
 import logging
 
 import pandas as pd
-
 from common import get_with_retry, write_long_csv
 
 logger = logging.getLogger("ingestion.eurostat")
@@ -30,8 +30,8 @@ logger = logging.getLogger("ingestion.eurostat")
 BASE_URL = "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data"
 
 DATASETS = {
-    "ilc_di12": "gini_index_eurostat",              # Gini coefficient of equivalised disposable income
-    "ilc_di11": "income_quintile_share_ratio",       # S80/S20 ratio
+    "ilc_di12": "gini_index_eurostat",  # Gini coefficient of equivalised disposable income
+    "ilc_di11": "income_quintile_share_ratio",  # S80/S20 ratio
     "ilc_li02": "at_risk_of_poverty_rate",
 }
 
@@ -59,7 +59,7 @@ def jsonstat_to_df(payload: dict, value_name: str) -> pd.DataFrame:
 
     def flat_index(coords: list[int]) -> int:
         idx = 0
-        for pos, size in zip(coords, sizes):
+        for pos, size in zip(coords, sizes, strict=False):
             idx = idx * size + pos
         return idx
 
@@ -74,7 +74,7 @@ def jsonstat_to_df(payload: dict, value_name: str) -> pd.DataFrame:
         if val is None:
             continue
         row = {}
-        for dim_id, pos in zip(dim_ids, coords):
+        for dim_id, pos in zip(dim_ids, coords, strict=False):
             code, label = dim_value_lists[dim_ids.index(dim_id)][pos]
             row[dim_id] = code
             row[dim_id + "_label"] = label
