@@ -1,0 +1,20 @@
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+exclude = ["airflow/logs", ".dvc", "data"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP", "B"]
+ignore = ["E501"]  # line-length is enforced by the formatter, not the linter
+
+[tool.mypy]
+# Scoped to the new modules added in the portfolio-upgrade pass rather than a
+# full-repo retrofit — the existing codebase has ~20 untyped files where
+# annotating everything wouldn't pay for itself. New modules are written with
+# type hints from the start and checked here.
+python_version = "3.11"
+ignore_missing_imports = true
+files = [
+    "predict-api/services/explain.py",
+    "features/schema.py",
+]

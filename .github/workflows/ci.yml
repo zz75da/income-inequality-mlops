@@ -8,6 +8,56 @@ on:
   workflow_dispatch:
 
 jobs:
+  lint:
+    name: Lint & Format (ruff)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dev dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: ruff check
+        run: ruff check .
+
+      - name: ruff format --check
+        run: ruff format --check .
+
+  security:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Audit dependencies
+        run: |
+          pip-audit -r requirements.txt || true
+          pip-audit -r train-api/requirements.txt || true
+          pip-audit -r predict-api/requirements.txt || true
+          pip-audit -r streamlit/requirements.txt || true
+        # Non-blocking for now (|| true): surfaces findings in the log without
+        # failing the whole pipeline on a transitive CVE with no fix available
+        # yet. Tighten to a hard failure once the baseline is clean.
+
   tests:
     name: Unit & Integration Tests
     runs-on: ubuntu-latest

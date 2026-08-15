@@ -1,0 +1,8 @@
+# Local/CI dev tooling — not installed by any service Dockerfile (mirrors how
+# the root requirements.txt already sits outside every Dockerfile's install path).
+ruff==0.6.9
+mypy==1.11.2
+pre-commit==3.8.0
+pip-audit==2.7.3
+shap==0.46.0
+kaleido==0.2.1

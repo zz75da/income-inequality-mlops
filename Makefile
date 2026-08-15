@@ -1,7 +1,8 @@
 # Income Inequality MLOps — convenience targets
 COMPOSE = docker compose
 
-.PHONY: up down logs restart build ingest features train test lint dvc-repro dvc-push observability grafana-dash
+.PHONY: up down logs restart build ingest features train test lint dvc-repro dvc-push observability grafana-dash \
+        install-dev format lint-ruff precommit-install security
 
 # --- Full stack ---
 up:
@@ -25,6 +26,7 @@ ingest:
 	python ingestion/ingest_oecd.py
 	python ingestion/ingest_wid.py
 	python ingestion/ingest_eurostat.py
+	python ingestion/ingest_gdim.py
 	python ingestion/merge_sources.py
 
 features:
@@ -43,6 +45,22 @@ test:
 
 lint:
 	python -m py_compile $$(find . -name "*.py" -not -path "./.venv/*" -not -path "./airflow/logs/*")
+
+# --- Engineering hygiene ---
+install-dev:
+	pip install -r requirements-dev.txt
+
+format:
+	ruff format .
+
+lint-ruff:
+	ruff check .
+
+precommit-install:
+	pre-commit install
+
+security:
+	pip-audit -r requirements.txt -r train-api/requirements.txt -r predict-api/requirements.txt -r streamlit/requirements.txt
 
 # --- Observability only ---
 observability:
