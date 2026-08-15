@@ -70,6 +70,39 @@ def test_predict_income_group(client):
     assert sum(body["probabilities"].values()) == pytest.approx(1.0)
 
 
+def test_explain_gini(client, monkeypatch, import_service_app):
+    predict_app = import_service_app("predict-api")
+    monkeypatch.setattr(predict_app, "explain", lambda name, X, **kw: {"gdp_per_capita_ppp": 0.5, "region_code": -0.1})
+
+    resp = client.post("/explain-gini", json={"gdp_per_capita_ppp": 30000, "region": "Europe"})
+    assert resp.status_code == 200
+    assert resp.json() == {"contributions": {"gdp_per_capita_ppp": 0.5, "region_code": -0.1}}
+
+
+def test_explain_gini_503_when_no_explainer(client, monkeypatch, import_service_app):
+    predict_app = import_service_app("predict-api")
+    monkeypatch.setattr(predict_app, "explain", lambda name, X, **kw: None)
+
+    resp = client.post("/explain-gini", json={})
+    assert resp.status_code == 503
+
+
+def test_explain_income_group_reports_predicted_class(client, monkeypatch, import_service_app):
+    predict_app = import_service_app("predict-api")
+
+    def fake_explain(name, X, class_index=None, **kw):
+        assert class_index == 2  # DummyClassifier's predict_proba peaks at index 2
+        return {"gdp_per_capita_ppp": 0.3}
+
+    monkeypatch.setattr(predict_app, "explain", fake_explain)
+
+    resp = client.post("/explain-income-group", json={})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["contributions"] == {"gdp_per_capita_ppp": 0.3}
+    assert body["explained_class"] == "Lower middle income"
+
+
 def test_predict_gini_503_when_model_missing(monkeypatch, import_service_app):
     predict_app = import_service_app("predict-api")
 

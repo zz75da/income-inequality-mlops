@@ -13,6 +13,9 @@
 #   POST /predict-gini            -> {"gini_index": float, "interval_80pct": [lo, hi]}
 #   POST /predict-mobility        -> {"intergen_income_elasticity": float, "interval_80pct": [lo, hi]}
 #   POST /predict-income-group    -> {"income_group": str, "probabilities": {...}}
+#   POST /explain-gini            -> {"contributions": {feature: shap_value, ...}}
+#   POST /explain-mobility        -> {"contributions": {feature: shap_value, ...}}
+#   POST /explain-income-group    -> {"contributions": {...}, "explained_class": str}
 #   POST /reload-artifacts        (reload models from disk after a training run)
 #   GET  /drift-status
 #   POST /drift-trigger-report
@@ -35,6 +38,7 @@ from prometheus_client import Counter, Histogram
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel
 from services.drift_monitor import buffer_size, record_prediction, reference_exists, trigger_report
+from services.explain import build_explainers, explain
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("predict-api")
@@ -114,6 +118,8 @@ def load_artifacts() -> None:
         logger.warning("feature_medians.json not found — a caller omitting a numeric field will fall back to 0.0")
         _feature_medians = {}
 
+    build_explainers(_models)
+
 
 @app.on_event("startup")
 def startup_event():
@@ -185,6 +191,43 @@ def predict_income_group(payload: FeaturePayload):
         "income_group": label_encoder.inverse_transform([pred_idx])[0],
         "probabilities": {cls: float(p) for cls, p in zip(label_encoder.classes_, proba, strict=False)},
     }
+
+
+@app.post("/explain-gini")
+def explain_gini(payload: FeaturePayload):
+    if "gini" not in _models:
+        raise HTTPException(status_code=503, detail="model_gini.pkl not loaded — train it first")
+    X = _build_feature_row(payload)
+    contributions = explain("gini", X)
+    if contributions is None:
+        raise HTTPException(status_code=503, detail="No SHAP explainer available for gini")
+    return {"contributions": contributions}
+
+
+@app.post("/explain-mobility")
+def explain_mobility(payload: FeaturePayload):
+    if "mobility" not in _models:
+        raise HTTPException(status_code=503, detail="model_mobility.pkl not loaded — train it first")
+    X = _build_feature_row(payload)
+    contributions = explain("mobility", X)
+    if contributions is None:
+        raise HTTPException(status_code=503, detail="No SHAP explainer available for mobility")
+    return {"contributions": contributions}
+
+
+@app.post("/explain-income-group")
+def explain_income_group(payload: FeaturePayload):
+    if "income_group" not in _models:
+        raise HTTPException(status_code=503, detail="model_income_group.pkl not loaded — train it first")
+    bundle = _models["income_group"]
+    model, label_encoder = bundle["model"], bundle["label_encoder"]
+    X = _build_feature_row(payload)
+    proba = np.asarray(model.predict_proba(X)[0])
+    pred_idx = int(proba.argmax())
+    contributions = explain("income_group", X, class_index=pred_idx)
+    if contributions is None:
+        raise HTTPException(status_code=503, detail="No SHAP explainer available for income_group")
+    return {"contributions": contributions, "explained_class": label_encoder.inverse_transform([pred_idx])[0]}
 
 
 @app.get("/models/registry-status")
