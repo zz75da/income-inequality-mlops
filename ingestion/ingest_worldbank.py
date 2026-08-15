@@ -14,7 +14,7 @@ Two request shapes are used:
         classification; a historical per-year series requires manually
         downloading the World Bank's "OGHIST" spreadsheet
         (https://datahelpdesk.worldbank.org/knowledgebase/articles/906519) —
-        see `fetch_income_group_note()` below.
+        see `fetch_income_group_classification()` below.
 """
 
 from __future__ import annotations
@@ -45,7 +45,27 @@ START_YEAR = 1990
 END_YEAR = 2024
 
 
-def fetch_indicator(indicator_code: str, feature_name: str) -> pd.DataFrame:
+def fetch_country_metadata() -> list[dict]:
+    """Raw /country metadata — used both to build the real-countries filter
+    (excludes World Bank's own regional/income-group aggregates, e.g. "Africa
+    Eastern and Southern", "World") and for the income-group classification.
+    One request shared by both, rather than fetching it twice.
+
+    Real bug the real-countries filter caught: fetch_indicator()'s old filter
+    (countryiso3code length == 3) let those aggregates straight through —
+    plenty of them (AFE, WLD, EAS, ...) are 3 letters too — so they showed up
+    as fake "countries" throughout the panel and the Streamlit country
+    selector.
+    """
+    url = f"{BASE_URL}/country"
+    params = {"format": "json", "per_page": 400}
+    resp = get_with_retry(url, params=params)
+    payload = resp.json()
+    _, data = payload[0], payload[1]
+    return data
+
+
+def fetch_indicator(indicator_code: str, feature_name: str, real_country_codes: set[str]) -> pd.DataFrame:
     """Fetch one indicator's full time series for all countries, paginated."""
     rows: list[dict] = []
     page = 1
@@ -65,12 +85,8 @@ def fetch_indicator(indicator_code: str, feature_name: str) -> pd.DataFrame:
         for item in data:
             if item.get("value") is None:
                 continue
-            # Skip aggregate "regions" (e.g. "World", "OECD members") — keep only
-            # real countries. WB flags these with an empty `region.value`... in
-            # practice the simplest robust filter is `countryiso3code` length == 3
-            # AND not one of the known aggregate codes bank exposes as iso3-shaped.
             iso3 = item.get("countryiso3code")
-            if not iso3 or len(iso3) != 3:
+            if not iso3 or iso3 not in real_country_codes:
                 continue
             rows.append(
                 {
@@ -90,7 +106,7 @@ def fetch_indicator(indicator_code: str, feature_name: str) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def fetch_income_group_classification() -> pd.DataFrame:
+def fetch_income_group_classification(data: list[dict]) -> pd.DataFrame:
     """
     Current World Bank income-group classification per country (L / LM / UM / H).
 
@@ -102,12 +118,6 @@ def fetch_income_group_classification() -> pd.DataFrame:
     and place it at data/raw/worldbank_income_group_history.xlsx —
     merge_sources.py will prefer that file if present.
     """
-    url = f"{BASE_URL}/country"
-    params = {"format": "json", "per_page": 400}
-    resp = get_with_retry(url, params=params)
-    payload = resp.json()
-    _, data = payload[0], payload[1]
-
     rows = []
     for item in data:
         iso3 = item.get("id")
@@ -128,11 +138,18 @@ def fetch_income_group_classification() -> pd.DataFrame:
 
 
 def main() -> None:
-    frames = [fetch_indicator(code, name) for code, name in INDICATORS.items()]
+    country_metadata = fetch_country_metadata()
+    real_country_codes = {
+        item["id"]
+        for item in country_metadata
+        if item.get("id") and item.get("incomeLevel", {}).get("value") not in (None, "Aggregates")
+    }
+
+    frames = [fetch_indicator(code, name, real_country_codes) for code, name in INDICATORS.items()]
     long_df = pd.concat(frames, ignore_index=True)
     write_long_csv(long_df, "worldbank")
 
-    income_groups = fetch_income_group_classification()
+    income_groups = fetch_income_group_classification(country_metadata)
     income_groups.to_csv("data/raw/worldbank_income_group_current.csv", index=False)
     logger.info("Wrote %d rows -> data/raw/worldbank_income_group_current.csv", len(income_groups))
 
