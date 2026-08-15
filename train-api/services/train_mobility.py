@@ -4,7 +4,16 @@ from __future__ import annotations
 
 import logging
 
-from common import group_train_test_split, load_features, load_params, mlflow_setup, save_metrics, save_model
+import numpy as np
+from common import (
+    group_train_test_split,
+    load_features,
+    load_params,
+    mlflow_setup,
+    register_and_promote,
+    save_metrics,
+    save_model,
+)
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, r2_score
 
@@ -45,11 +54,12 @@ def main() -> None:
         metrics = {
             "mae": float(mean_absolute_error(y_test, preds)),
             "r2": float(r2_score(y_test, preds)),
+            "residual_std": float(np.std(y_test - preds)),
             "n_train": len(X_train),
             "n_test": len(X_test),
         }
         mlflow.log_metrics({k: v for k, v in metrics.items() if isinstance(v, int | float)})
-        mlflow.sklearn.log_model(model, artifact_path="model_mobility")
+        model_info = mlflow.sklearn.log_model(model, artifact_path="model_mobility")
         logger.info(
             "intergen_income_elasticity — MAE=%.3f R2=%.3f (train=%d test=%d)",
             metrics["mae"],
@@ -57,6 +67,7 @@ def main() -> None:
             metrics["n_train"],
             metrics["n_test"],
         )
+        register_and_promote(mlflow, NAME, model_info.model_uri, metrics, params)
 
     save_model(model, NAME)
     save_metrics(metrics, NAME)

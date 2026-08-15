@@ -65,6 +65,23 @@ train:
   cv_folds: 5
   early_stopping_rounds: 30
 
+# MLflow model registry promotion gates — a training run only gets promoted
+# to the "Production" registry stage if its metric clears the bar here;
+# otherwise it stays in "Staging" (still logged, just not live). gini and
+# income_group mirror monitoring/alert-rules.yml's existing GiniModelR2Low /
+# IncomeGroupAccuracyLow thresholds exactly — keep both in sync by hand if
+# you change either (Prometheus rule files can't read this YAML directly).
+promotion_gates:
+  gini:
+    metric: r2
+    min: 0.4
+  mobility:
+    metric: r2
+    min: 0.15
+  income_group:
+    metric: accuracy
+    min: 0.7
+
 monitoring:
   drift_reference_min_rows: 100
   drift_psi_threshold: 0.2   # population stability index alert threshold per feature

@@ -13,12 +13,21 @@ groups:
         labels: {severity: critical}
         annotations: {summary: "predict-api has been down for 2+ minutes"}
 
+  # These three thresholds mirror params.yaml's promotion_gates exactly — a
+  # training run only gets promoted to the MLflow registry's "Production"
+  # stage if it clears the same bar. Prometheus rule files can't read that
+  # YAML directly, so keep both in sync by hand if you change either.
   - name: model-quality
     rules:
       - alert: GiniModelR2Low
         expr: model_final_r2{target="gini"} < 0.4
         labels: {severity: warning}
         annotations: {summary: "Gini regressor R2 dropped below 0.4 on the last training run"}
+
+      - alert: MobilityModelR2Low
+        expr: model_final_r2{target="mobility"} < 0.15
+        labels: {severity: warning}
+        annotations: {summary: "Mobility regressor R2 dropped below 0.15 on the last training run"}
 
       - alert: IncomeGroupAccuracyLow
         expr: model_final_accuracy{target="income_group"} < 0.7

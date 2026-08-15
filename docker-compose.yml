@@ -88,6 +88,7 @@ services:
       - .env
     environment:
       MLFLOW_EXPERIMENT_NAME: income-inequality
+      PUSHGATEWAY_URL: http://pushgateway:9091
     volumes:
       - ./data:/app/data
       - ./params.yaml:/app/params.yaml:ro

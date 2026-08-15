@@ -15,7 +15,15 @@ from __future__ import annotations
 
 import logging
 
-from common import feature_columns, load_features, load_params, mlflow_setup, save_metrics, save_model
+from common import (
+    feature_columns,
+    load_features,
+    load_params,
+    mlflow_setup,
+    register_and_promote,
+    save_metrics,
+    save_model,
+)
 from sklearn.metrics import accuracy_score, classification_report, f1_score
 from sklearn.model_selection import GroupShuffleSplit
 from sklearn.preprocessing import LabelEncoder
@@ -70,13 +78,14 @@ def main() -> None:
             "classes": label_encoder.classes_.tolist(),
         }
         mlflow.log_metrics({k: v for k, v in metrics.items() if isinstance(v, int | float)})
-        mlflow.sklearn.log_model(model, artifact_path="model_income_group")
+        model_info = mlflow.sklearn.log_model(model, artifact_path="model_income_group")
         logger.info(
             "income_group — acc=%.3f macro_f1=%.3f\n%s",
             metrics["accuracy"],
             metrics["macro_f1"],
             classification_report(y_test, preds, target_names=label_encoder.classes_),
         )
+        register_and_promote(mlflow, NAME, model_info.model_uri, metrics, params)
 
     save_model({"model": model, "label_encoder": label_encoder}, NAME)
     save_metrics(metrics, NAME)
