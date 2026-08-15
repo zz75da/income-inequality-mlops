@@ -96,7 +96,8 @@ jobs:
             "xgboost==2.0.3" \
             "pyyaml==6.0.1" \
             "pycountry==24.6.1" \
-            "pandera==0.19.3"
+            "pandera==0.19.3" \
+            "shap==0.46.0"
 
       - name: Install test dependencies
         run: pip install -r tests/requirements-test.txt
