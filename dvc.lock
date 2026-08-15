@@ -9,13 +9,13 @@ stages:
       size: 3289
     - path: ingestion/ingest_worldbank.py
       hash: md5
-      md5: f1cada87158042443b6a773e55bbaf81
-      size: 5433
+      md5: 8867cac2267dfb1c433f338c58f2f9c7
+      size: 6132
     outs:
     - path: data/raw/worldbank.csv
       hash: md5
-      md5: 8dac7b75230498843d22a8707918a943
-      size: 3885849
+      md5: a55fce662cd533f029b2118b919fced8
+      size: 3082354
     - path: data/raw/worldbank_income_group_current.csv
       hash: md5
       md5: e14aaedf660834b20b94c0832ddae172
@@ -97,8 +97,8 @@ stages:
       size: 54
     - path: data/raw/worldbank.csv
       hash: md5
-      md5: 8dac7b75230498843d22a8707918a943
-      size: 3885849
+      md5: a55fce662cd533f029b2118b919fced8
+      size: 3082354
     - path: data/raw/worldbank_income_group_current.csv
       hash: md5
       md5: e14aaedf660834b20b94c0832ddae172
@@ -110,15 +110,15 @@ stages:
     outs:
     - path: data/processed/merged_panel.csv
       hash: md5
-      md5: 8290fdffc2a62c10173fb81986688fe5
-      size: 1696923
+      md5: 26a492be37645a7e24f0bb36d02f9f5a
+      size: 1467030
   build_features:
     cmd: python features/build_features.py
     deps:
     - path: data/processed/merged_panel.csv
       hash: md5
-      md5: 8290fdffc2a62c10173fb81986688fe5
-      size: 1696923
+      md5: 26a492be37645a7e24f0bb36d02f9f5a
+      size: 1467030
     - path: features/build_features.py
       hash: md5
       md5: eba560408499db1968bf7d73b3153a40
@@ -134,23 +134,23 @@ stages:
     outs:
     - path: data/artifacts/categorical_mappings.json
       hash: md5
-      md5: 1fbec2621662b389442f7ff0a27c911a
-      size: 422
+      md5: 4156a79faa0a31b30ec800c038f705f6
+      size: 404
     - path: data/artifacts/feature_medians.json
       hash: md5
-      md5: 6a2b703ebac5c433b1eac37d5ed23a7b
-      size: 410
+      md5: 6474572286789532f80cf9678c91d75a
+      size: 395
     - path: data/processed/features.csv
       hash: md5
-      md5: b2a093d2db5316fd55928bb0e9a60137
-      size: 2028818
+      md5: 1b633a2edf3aa4b5101ece401a2ead6d
+      size: 1718973
   train_gini:
     cmd: python train-api/services/train_gini.py
     deps:
     - path: data/processed/features.csv
       hash: md5
-      md5: b2a093d2db5316fd55928bb0e9a60137
-      size: 2028818
+      md5: 1b633a2edf3aa4b5101ece401a2ead6d
+      size: 1718973
     - path: params.yaml
       hash: md5
       md5: 0603a4d34afd529297d1ac150b9d0142
@@ -166,19 +166,19 @@ stages:
     outs:
     - path: data/artifacts/metrics_gini.json
       hash: md5
-      md5: c63bb53d306c4b288dc98bec18658449
-      size: 132
+      md5: bb2f6eb5394a1d35dd768d54e85be488
+      size: 131
     - path: data/artifacts/model_gini.pkl
       hash: md5
-      md5: f521b9a653774374fe8a41ecdc3d01e4
-      size: 948623
+      md5: 1588c67107ebdf0cf30e3f2182cd1287
+      size: 952363
   train_income_group:
     cmd: python train-api/services/train_income_group.py
     deps:
     - path: data/processed/features.csv
       hash: md5
-      md5: b2a093d2db5316fd55928bb0e9a60137
-      size: 2028818
+      md5: 1b633a2edf3aa4b5101ece401a2ead6d
+      size: 1718973
     - path: params.yaml
       hash: md5
       md5: 0603a4d34afd529297d1ac150b9d0142
@@ -194,19 +194,19 @@ stages:
     outs:
     - path: data/artifacts/metrics_income_group.json
       hash: md5
-      md5: 0f0305a2b623b0cf4039e708a6a5b907
-      size: 216
+      md5: 4e17f5a3068e740faceec02bb85d63a9
+      size: 217
     - path: data/artifacts/model_income_group.pkl
       hash: md5
-      md5: ae271cf2971d7d97e1614b3a07d76cab
-      size: 1348213
+      md5: e3d15bcbd1ce47c91974dcc5e80177f1
+      size: 1349846
   train_mobility:
     cmd: python train-api/services/train_mobility.py
     deps:
     - path: data/processed/features.csv
       hash: md5
-      md5: b2a093d2db5316fd55928bb0e9a60137
-      size: 2028818
+      md5: 1b633a2edf3aa4b5101ece401a2ead6d
+      size: 1718973
     - path: params.yaml
       hash: md5
       md5: 0603a4d34afd529297d1ac150b9d0142
@@ -222,9 +222,9 @@ stages:
     outs:
     - path: data/artifacts/metrics_mobility.json
       hash: md5
-      md5: 885d7bee765c292c76a2e2f75d206b39
+      md5: 026ad2365f44ba77542f37296aa9d88a
       size: 136
     - path: data/artifacts/model_mobility.pkl
       hash: md5
-      md5: 39bf8c437c95f8eb1e9efca4f48ad6c0
-      size: 8440041
+      md5: 68517a779f8b5882ac8f123a1b5b141e
+      size: 8431098
