@@ -7,7 +7,7 @@ WORKDIR).
 
 from __future__ import annotations
 
-import importlib
+import importlib.util
 import sys
 from pathlib import Path
 
@@ -27,8 +27,8 @@ for path in [
 
 @pytest.fixture
 def import_service_app():
-    """Import a service's app.py by explicit directory, bypassing sys.modules'
-    by-name cache.
+    """Import a service's app.py by explicit file path, under a name unique
+    to that service — not the ambiguous, colliding `import app`.
 
     train-api/app.py and predict-api/app.py are both literally named "app.py",
     and both their directories sit on sys.path at once (above). A plain
@@ -37,17 +37,28 @@ def import_service_app():
     later `import app` in another test file silently gets served the wrong
     service's module instead of raising ImportError. Only bites when the full
     suite runs together (exactly what CI does), not when running a single
-    test file in isolation — evict the cache and re-resolve against the
-    intended service's directory every time instead.
+    test file in isolation.
+
+    Loading by explicit path under a distinct module name (e.g.
+    "_service_app_predict_api") avoids that collision. Cached in sys.modules
+    per service (not re-executed on every call) because each app.py registers
+    module-level Prometheus Counter/Histogram objects into the global default
+    CollectorRegistry at import time — re-running that registration a second
+    time raises "Duplicated timeseries in CollectorRegistry", so re-importing
+    fresh on every test would trade the collision bug for a re-registration
+    crash instead of actually fixing anything.
     """
 
     def _import(service_dir: str):
-        sys.modules.pop("app", None)
-        target = str(ROOT / service_dir)
-        if target in sys.path:
-            sys.path.remove(target)
-        sys.path.insert(0, target)
-        return importlib.import_module("app")
+        cache_key = f"_service_app_{service_dir.replace('-', '_')}"
+        if cache_key in sys.modules:
+            return sys.modules[cache_key]
+        app_path = ROOT / service_dir / "app.py"
+        spec = importlib.util.spec_from_file_location(cache_key, app_path)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[cache_key] = module
+        spec.loader.exec_module(module)
+        return module
 
     return _import
 
