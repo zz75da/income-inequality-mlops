@@ -47,7 +47,7 @@ paid API keys required (WID.world has an optional free key that only raises rate
 |---|---|---|
 | [World Bank Open Data](https://api.worldbank.org/v2/) | Gini index, GDP, unemployment, education/tax/social spending, income-group classification | Public REST API |
 | [OECD Income Distribution Database](https://data-explorer.oecd.org/vis?fs[0]=Topic,1%7CSociety%23SOC%23%7CInequality%23SOC_INE%23&df[id]=DSD_WISE_IDD%40DF_IDD) | Gini index (OECD member countries, alternate methodology) | Public SDMX API |
-| [WID.world](https://wid.world/data/) | Top-10% / bottom-50% pre-tax income shares | Public REST API |
+| [WID.world](https://wid.world/data/) | Top-10% / bottom-50% pre-tax income shares | Public REST API (currently retired — best-effort, see limitations) |
 | [Eurostat EU-SILC](https://ec.europa.eu/eurostat/web/microdata/collections-research/european-union-statistics-on-income-and-living-conditions) | Gini, S80/S20 ratio, at-risk-of-poverty rate (aggregate indicators only — see limitations) | Public JSON-stat API |
 | World Bank GDIM | Intergenerational income elasticity | Manual download (no API) |
 
@@ -219,15 +219,16 @@ Airflow Fernet/secret keys, Grafana admin password, optional WID API key).
 
 ## Known Limitations
 
-- **Sandbox-authored, not sandbox-tested end-to-end.** The four `ingest_*.py` scripts are
-  written against each source's documented, stable public API contract, but the environment
-  this project was scaffolded in has no outbound access to `api.worldbank.org`,
-  `sdmx.oecd.org`, `ec.europa.eu`, or `wid.world`. `ingestion/merge_sources.py` and
-  `features/build_features.py` *have* been exercised end-to-end against synthetic fixtures
-  (see `tests/integration/test_workflow.py`) and confirmed to coalesce/impute/encode
-  correctly. Run the ingestion scripts from a machine with normal internet access; if an
-  API response shape has drifted since this was written, the error will point at exactly
-  which parse step failed.
+- **Verified end-to-end against live sources (2026-08).** World Bank, OECD, and Eurostat
+  ingestion all run cleanly against the live APIs. One real drift was caught and fixed: OECD's
+  SDMX-JSON response nests the dimension structure under `data.structures[0]`, not
+  `data.structure` as originally coded — `ingestion/ingest_oecd.py` now matches the real shape.
+- **WID.world's public REST API (`/api/v3.php`) has been retired** and returns 404 with no
+  documented public replacement — the site and official R package now call a private,
+  key-gated AWS API Gateway endpoint not obtainable through public signup. `ingest_wid.py` is
+  therefore treated as best-effort (like `ingest_gdim.py`): its failure doesn't abort a
+  training run, and `top10_income_share`/`bottom50_income_share` fall back to median
+  imputation when absent. See the script's docstring for details.
 - **No true household income-bracket target.** EU-SILC microdata (individual/household rows)
   requires a restricted research-access agreement with Eurostat — it is not available through
   any free API. `income_group` (World Bank's Low/Lower-middle/Upper-middle/High classification)

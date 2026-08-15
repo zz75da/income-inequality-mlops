@@ -55,13 +55,17 @@ def main() -> None:
                     len(dropped), data_cfg["min_years_required"], sorted(dropped)[:20])
     panel = panel[panel["country_code"].isin(keep_countries)].copy()
 
-    numeric_cols = [c for c in feat_cfg["numeric_features"] if c in panel.columns]
-    missing_numeric = set(feat_cfg["numeric_features"]) - set(numeric_cols)
+    missing_numeric = set(feat_cfg["numeric_features"]) - set(panel.columns)
     if missing_numeric:
-        logger.warning("Configured numeric features not present in merged panel (upstream ingestion may have failed): %s", missing_numeric)
+        logger.warning("Configured numeric features not present in merged panel (upstream ingestion may have failed) — "
+                        "adding as all-NaN so downstream column selection doesn't KeyError: %s", missing_numeric)
+        for col in missing_numeric:
+            panel[col] = pd.NA
 
     # Per-country median impute, then global median for still-missing values.
-    for col in numeric_cols:
+    # A column that's NaN everywhere (e.g. a source that failed ingestion)
+    # stays NaN here — XGBoost handles NaN natively via its own split logic.
+    for col in feat_cfg["numeric_features"]:
         panel[col] = panel.groupby("country_code")[col].transform(lambda s: s.fillna(s.median()))
         panel[col] = panel[col].fillna(panel[col].median())
 

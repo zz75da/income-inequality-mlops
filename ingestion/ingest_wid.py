@@ -2,9 +2,6 @@
 Pull top-10% and bottom-50% pre-tax national income shares from the World
 Inequality Database (WID.world) API.
 
-Docs: https://wid.world/document/wid-world-api-documentation/
-Source browsed by the user: https://wid.world/data/
-
     GET https://wid.world/api/v3.php
         ?method=getData
         &country=<comma-separated ISO2 codes, or "all">
@@ -20,8 +17,17 @@ map to a real ISO3 (regional aggregates, "QM"/"XX"-style WID-specific codes)
 are dropped — those are supra-national aggregates, not countries, and aren't
 useful features for a per-country model anyway.
 
-An optional WID_API_KEY (free registration) raises rate limits but is not
-required for the volumes this project needs — see .env.template.
+KNOWN ISSUE (as of 2026-08): the public `/api/v3.php` endpoint documented
+above 404s. WID.world's site and R package (`wid-r-tool`) now pull from a
+private AWS API Gateway endpoint that requires a server-issued API key not
+obtainable through any public signup flow — there is no drop-in public
+replacement. Because of this, this script is treated as best-effort:
+train-api and the Airflow DAG both tolerate its failure (same as
+ingest_gdim.py) and merge_sources.py/build_features.py already handle the
+resulting missing top10_income_share/bottom50_income_share columns via
+per-country/global median imputation. If WID.world ever republishes a public
+CSV bulk-download or reinstates the v3 API, point API_URL at it and this
+script starts working again with no other changes needed.
 """
 from __future__ import annotations
 

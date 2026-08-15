@@ -42,7 +42,7 @@ START_PERIOD = 1990
 def flatten_sdmx_json(payload: dict) -> pd.DataFrame:
     """Generic SDMX-JSON (v2 'jsondata') series/observations -> long DataFrame."""
     dataset = payload["data"]["dataSets"][0]
-    structure = payload["data"]["structure"]
+    structure = payload["data"]["structures"][0]
     series_dims = structure["dimensions"]["series"]
     obs_dims = structure["dimensions"]["observation"]
 

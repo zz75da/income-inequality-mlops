@@ -77,7 +77,7 @@ def _run_job(job_id: str, target: str, run_ingestion: bool) -> None:
         if run_ingestion:
             for script in INGEST_SCRIPTS:
                 ok = _run_script(script, job_id)
-                if not ok and script.name not in ("ingest_gdim.py",):  # GDIM is expected-to-fail without manual file
+                if not ok and script.name not in ("ingest_gdim.py", "ingest_wid.py"):  # GDIM needs a manual file; WID's public API is best-effort (see ingest_wid.py docstring)
                     raise RuntimeError(f"{script.name} failed — see log")
 
         targets = list(TARGET_SCRIPTS) if target == "all" else [target]

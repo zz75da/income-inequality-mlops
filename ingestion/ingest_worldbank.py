@@ -35,7 +35,7 @@ INDICATORS = {
     "NY.GDP.MKTP.KD.ZG": "gdp_growth_pct",
     "SL.UEM.TOTL.ZS": "unemployment_rate",
     "SE.XPD.TOTL.GD.ZS": "education_expenditure_pct_gdp",
-    "GC.XPN.TOTL.GD.ZS": "govt_expense_pct_gdp",       # proxy for social spending
+    "GC.XPN.TOTL.GD.ZS": "social_spending_pct_gdp",     # govt expense % GDP, proxy for social spending
     "GC.TAX.TOTL.GD.ZS": "tax_revenue_pct_gdp",
     "SP.URB.TOTL.IN.ZS": "urban_population_pct",
     "SP.POP.TOTL": "population_total",
