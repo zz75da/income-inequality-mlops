@@ -238,10 +238,15 @@ def page_explore(df: pd.DataFrame) -> None:
 
     st.subheader("Country time series")
     countries = sorted(df["country_name"].dropna().unique())
+    default_countries = [
+        c
+        for c in ["United States", "China", "Japan", "Brazil", "Germany", "United Kingdom", "France"]
+        if c in countries
+    ]
     selected = st.multiselect(
         "Countries (up to 8 — more than that gets hard to read)",
         countries,
-        default=countries[:3] if countries else [],
+        default=default_countries,
         max_selections=8,
     )
     if selected:
