@@ -31,6 +31,7 @@ import requests
 import yaml
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 # Must be the first Streamlit command in the script — before even touching
 # st.secrets in _config() below, which otherwise trips "set_page_config()
@@ -160,6 +161,24 @@ def load_categorical_mappings() -> dict:
     (e.g. missing the trailing space in the World Bank's real region labels)
     that predict-api silently encodes as -1."""
     return load_json(ARTIFACTS_DIR / "categorical_mappings.json") or {}
+
+
+def render_mermaid(diagram: str, height: int = 320) -> None:
+    """st.markdown() only puts a ```mermaid fence into a plain code block —
+    unlike GitHub, Streamlit has no built-in Mermaid renderer. Render it
+    client-side via mermaid.js from a CDN instead (Streamlit Cloud has
+    outbound internet access, so this works there the same as locally)."""
+    components.html(
+        f"""
+        <div class="mermaid">{diagram}</div>
+        <script type="module">
+            import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+            mermaid.initialize({{ startOnLoad: true, theme: "neutral" }});
+        </script>
+        """,
+        height=height,
+        scrolling=True,
+    )
 
 
 def predict_api_reachable() -> bool:
@@ -430,9 +449,8 @@ aggregates, and the World Bank's GDIM mobility database — all public, unauthen
     )
 
     st.subheader("Architecture")
-    st.markdown(
+    render_mermaid(
         """
-```mermaid
 flowchart LR
     subgraph ingest["Ingestion (Airflow, @monthly)"]
         WB[World Bank] --> M[merge_sources.py]
@@ -448,7 +466,6 @@ flowchart LR
     MLF --> P[predict-api]
     P --> S[Streamlit]
     P -.drift buffer.-> P
-```
 """
     )
 
