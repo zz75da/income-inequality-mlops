@@ -2,8 +2,9 @@
 
 [![CI — Tests & DVC Sync](https://github.com/zz75da/income-inequality-mlops/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/zz75da/income-inequality-mlops/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-zzeghoud-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/in/zzeghoud)
 
-**Author:** [zz75da](https://github.com/zz75da)
+**Author:** [zz75da](https://github.com/zz75da) · [LinkedIn](https://www.linkedin.com/in/zzeghoud)
 
 End-to-end MLOps platform predicting country-level income inequality from public macroeconomic data.
 FastAPI microservices, Airflow orchestration, DVC/DagsHub data+model versioning, MLflow experiment
@@ -365,8 +366,13 @@ tutorial-perfect assumptions:
 
 ---
 
-## Author & License
+## About the Author
 
-**Author:** [zz75da](https://github.com/zz75da)
+Built end-to-end — ingestion through deployment — as a portfolio piece demonstrating full-lifecycle
+MLOps: reproducible data/model versioning, gated experiment tracking, monitored serving, and a
+usable frontend, not just a notebook with a good R². Reach out via LinkedIn if you'd like to talk
+about it.
+
+**Author:** [zz75da](https://github.com/zz75da) · [LinkedIn](https://www.linkedin.com/in/zzeghoud)
 
 Licensed under the [MIT License](LICENSE) — Copyright © 2026 zz75da.

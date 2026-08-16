@@ -605,8 +605,19 @@ See the README's Known Limitations for the ones still open.
 """
     )
 
+    st.subheader("About the author")
+    st.markdown(
+        """
+Built end-to-end — ingestion through deployment — as a portfolio piece demonstrating full-lifecycle
+MLOps: reproducible data/model versioning, gated experiment tracking, monitored serving, and a
+usable frontend, not just a notebook with a good R². Reach out on LinkedIn if you'd like to talk
+about it.
+"""
+    )
+
     st.subheader("Links")
     st.markdown(
+        f"- [LinkedIn](https://www.linkedin.com/in/zzeghoud)\n"
         f"- [GitHub repository]({GITHUB_REPO_URL})\n"
         f"- [DagsHub project]({DAGSHUB_URL})\n"
         f"- [MLflow experiments]({DAGSHUB_MLFLOW_URL})"
