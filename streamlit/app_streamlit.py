@@ -465,6 +465,91 @@ aggregates, and the World Bank's GDIM mobility database — all public, unauthen
 """
     )
 
+    st.subheader("Understanding the predictions")
+    st.markdown(
+        """
+Each target is a **country-year** statistic — an aggregate estimate for a whole country in a given
+year, not a prediction about any individual person. Think of it the way a national unemployment
+rate or GDP figure works: informative about the population, silent about any one household.
+"""
+    )
+
+    with st.expander("Gini index — what it measures and how good the model is"):
+        st.markdown(
+            """
+**What it measures:** income inequality within a country, on a 0-100 scale. 0 would mean everyone
+has exactly the same income; 100 would mean one person has all of it. Real countries mostly fall
+between roughly 25 (e.g. several Nordic countries) and 63 (some of the most unequal economies) —
+so a few points of difference is meaningful, not noise.
+
+**Model quality here — R² 0.565, MAE 5.34:**
+- **R² (coefficient of determination)** is the share of country-to-country variation in Gini the
+  model explains from macro features (GDP per capita, unemployment, urbanization, tax/social
+  spending, etc.) — 1.0 would be a perfect fit, 0 would mean "no better than always guessing the
+  average." **0.565 means the model explains about 56% of why some countries are more unequal than
+  others.** The other 44% comes from things this dataset doesn't capture — labor law, union
+  density, informal-sector size, historical land distribution — so treat predictions as a
+  macro-driven estimate, not the full picture.
+- **MAE (mean absolute error)** is the average miss size, in actual Gini points: **a typical
+  prediction is off by about 5.3 points.** For context, that's roughly the gap between France and
+  the UK's Gini index — real, but not the difference between an equal and an unequal society.
+"""
+        )
+
+    with st.expander("Mobility (intergenerational income elasticity) — what it measures and how good the model is"):
+        st.markdown(
+            """
+**What it measures:** how strongly a child's income is tied to their parents' income, on roughly a
+0-1 scale. **Lower = more mobility** (your income is less determined by your parents' — e.g.
+Nordic countries cluster near 0.15-0.2). **Higher = less mobility** (income is more inherited —
+several countries with high inequality sit above 0.4-0.5). This is the least intuitive of the
+three targets and the one where "good" performance looks different from a typical regression.
+
+**Model quality here — R² 0.350, MAE 0.102:**
+- The elasticity itself only spans a narrow real-world range (roughly 0.1-0.6), so even a model
+  that's doing genuinely useful work will show a lower R² than Gini's — there's simply less
+  variance available to explain, and this metric is sparser and noisier in the source data (GDIM)
+  to begin with. **0.35 in this context is a meaningfully-better-than-average fit, not a weak one**
+  — read it relative to this target's ceiling, not against Gini's 0.565.
+- **MAE 0.102** means a typical prediction is off by about 0.1 elasticity points — on a 0.1-0.6
+  scale, enough to blur adjacent countries but still usually correct about which broad tier
+  (low/medium/high mobility) a country falls into.
+"""
+        )
+
+    with st.expander("Income group — what it measures and how good the model is"):
+        st.markdown(
+            """
+**What it measures:** a classification, not a number — which World Bank income bracket a country
+falls into (Low / Lower-middle / Upper-middle / High income), based on gross national income per
+capita. Unlike Gini or mobility, there's no partial credit for "close": the model is either right
+or wrong about the bracket.
+
+**Model quality here — Accuracy 0.992, Macro F1 0.991:**
+- **Accuracy** is simply the fraction of correct predictions — 99.2% here. That number alone can be
+  misleading on an imbalanced dataset (if most rows were "High income," always guessing "High
+  income" would already score well without learning anything).
+- **Macro F1** guards against exactly that: it averages the F1 score (precision/recall balance)
+  **per class, unweighted**, so a model that ignores a rare class gets penalized even if overall
+  accuracy stays high. **0.991 essentially matching accuracy means the model isn't leaning on the
+  common classes — it's genuinely distinguishing all four brackets,** not just the easy ones. This
+  is the most reliable of the three targets, which makes sense: GNI-per-capita brackets are a
+  close functional match for the GDP-per-capita feature already in the training data.
+"""
+        )
+
+    st.markdown(
+        f"""
+**Train/test rows and Registry status** (shown per-target on the Model Performance page): the
+train/test split is how "unseen data" performance above was measured — the model never saw the
+test rows during training, so those numbers estimate how it'd do on a genuinely new country-year.
+Registry status reflects a promotion gate (see the README's
+[Design Scope]({GITHUB_REPO_URL}#design-scope) section) — a model only reaches `Production` in the
+MLflow registry if its metric clears a minimum bar; falling short routes it to `Staging` instead of
+silently shipping a worse model.
+"""
+    )
+
     st.subheader("Architecture")
     render_mermaid(
         """
