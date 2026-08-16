@@ -151,6 +151,17 @@ def load_params() -> dict | None:
         return yaml.safe_load(f)
 
 
+@st.cache_data(ttl=300)
+def load_categorical_mappings() -> dict:
+    """category -> code maps written by build_features.py, keyed by column
+    name (e.g. "region", "income_group_lag1"). Predict page dropdowns are
+    sourced from this so a selected label always matches a code the model
+    actually saw in training — free text let users send an unseen category
+    (e.g. missing the trailing space in the World Bank's real region labels)
+    that predict-api silently encodes as -1."""
+    return load_json(ARTIFACTS_DIR / "categorical_mappings.json") or {}
+
+
 def predict_api_reachable() -> bool:
     """Short-timeout health probe so the Predict page can degrade gracefully
     instead of every button click raising/timing out. Explore/Performance/
@@ -258,10 +269,28 @@ def page_predict() -> None:
         top10_income_share = st.number_input("Top 10% income share", value=0.30)
         bottom50_income_share = st.number_input("Bottom 50% income share", value=0.15)
 
-    region = st.text_input("Region", value="Europe & Central Asia")
-    income_group_lag1 = st.selectbox(
-        "Previous income group", ["Low income", "Lower middle income", "Upper middle income", "High income", "UNKNOWN"]
+    mappings = load_categorical_mappings()
+    region_options = sorted(mappings.get("region", {}).keys()) or [
+        "East Asia & Pacific",
+        "Europe & Central Asia",
+        "Latin America & Caribbean",
+        "Middle East, North Africa, Afghanistan & Pakistan",
+        "North America",
+        "South Asia",
+        "Sub-Saharan Africa",
+    ]
+    income_group_options = sorted(mappings.get("income_group_lag1", {}).keys()) or [
+        "Low income",
+        "Lower middle income",
+        "Upper middle income",
+        "High income",
+        "UNKNOWN",
+    ]
+    default_region_idx = (
+        region_options.index("Europe & Central Asia") if "Europe & Central Asia" in region_options else 0
     )
+    region = st.selectbox("Region", region_options, index=default_region_idx)
+    income_group_lag1 = st.selectbox("Previous income group", income_group_options)
 
     payload = dict(
         gdp_per_capita_ppp=gdp_per_capita_ppp,
