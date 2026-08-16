@@ -1,7 +1,9 @@
 """
 Streamlit UI for the Income Inequality MLOps project.
 
-Five pages:
+Five pages (About first — landing page for a first-time visitor):
+  - About: architecture, data sources, and the real debugging stories behind
+    this project's known limitations.
   - Explore: choropleth of the latest Gini index per country + per-country
     time series, sourced straight from data/processed/features.csv (no API
     call needed — this is descriptive data, not a model prediction).
@@ -11,8 +13,6 @@ Five pages:
   - Model Performance: reads data/artifacts/metrics_*.json + params.yaml +
     registry_status.json directly (no predict-api call) — stays functional
     even if predict-api is down.
-  - About: architecture, data sources, and the real debugging stories behind
-    this project's known limitations.
   - Drift Reports: lists and embeds the Evidently HTML reports predict-api
     has generated under data/artifacts/drift_reports/.
 """
@@ -32,10 +32,31 @@ import yaml
 
 import streamlit as st
 
-PREDICT_API_URL = os.getenv("PREDICT_API_URL", "http://localhost:5003")
-GITHUB_REPO_URL = os.getenv("GITHUB_REPO_URL", "https://github.com/zz75da/income-inequality-mlops")
-DAGSHUB_URL = os.getenv("DAGSHUB_URL", "https://dagshub.com/zz75da/income-inequality-mlops")
-DAGSHUB_MLFLOW_URL = os.getenv("DAGSHUB_MLFLOW_URL", f"{DAGSHUB_URL}.mlflow/#/experiments")
+# Must be the first Streamlit command in the script — before even touching
+# st.secrets in _config() below, which otherwise trips "set_page_config()
+# must be called as the first Streamlit command" (a real crash this caused
+# once _config() started reading st.secrets ahead of it).
+st.set_page_config(page_title="Income Inequality MLOps", layout="wide", page_icon="📊")
+
+
+def _config(key: str, default: str) -> str:
+    """Read a config value from Streamlit Cloud's secrets manager first (its
+    Secrets UI populates st.secrets, not necessarily plain OS environment
+    variables), falling back to a real env var (docker-compose/local run),
+    then the given default."""
+    try:
+        value = st.secrets.get(key)
+        if value:
+            return value
+    except Exception:
+        pass
+    return os.getenv(key, default)
+
+
+PREDICT_API_URL = _config("PREDICT_API_URL", "http://localhost:5003")
+GITHUB_REPO_URL = _config("GITHUB_REPO_URL", "https://github.com/zz75da/income-inequality-mlops")
+DAGSHUB_URL = _config("DAGSHUB_URL", "https://dagshub.com/zz75da/income-inequality-mlops")
+DAGSHUB_MLFLOW_URL = _config("DAGSHUB_MLFLOW_URL", f"{DAGSHUB_URL}.mlflow/#/experiments")
 
 ROOT = Path(__file__).resolve().parent.parent
 FEATURES_PATH = ROOT / "data" / "processed" / "features.csv"
@@ -65,8 +86,6 @@ TARGETS = {
     "mobility": {"label": "Mobility (intergen. elasticity)", "metric_label": "R²", "metric_key": "r2"},
     "income_group": {"label": "Income group", "metric_label": "Accuracy", "metric_key": "accuracy"},
 }
-
-st.set_page_config(page_title="Income Inequality MLOps", layout="wide", page_icon="📊")
 
 
 def _try_dvc_pull_from_secrets() -> None:
@@ -457,7 +476,7 @@ def render_sidebar() -> None:
 
 def main() -> None:
     render_sidebar()
-    page = st.sidebar.radio("Page", ["Explore", "Predict", "Model Performance", "About", "Drift Reports"])
+    page = st.sidebar.radio("Page", ["About", "Explore", "Predict", "Model Performance", "Drift Reports"])
 
     if page == "Explore":
         df = load_features()
