@@ -10,8 +10,21 @@ FastAPI microservices, Airflow orchestration, DVC/DagsHub data+model versioning,
 tracking with registry-gated model promotion, and Prometheus/Grafana monitoring — scoped for a
 tabular, low-QPS, periodically-refreshed dataset rather than a high-throughput production simulation.
 
+## Live Demo
+
+**[income-inequality-mlops-zz75da.streamlit.app](https://income-inequality-mlops-zz75da.streamlit.app/)** —
+Streamlit Cloud frontend, calling a predict-api instance hosted on Render's free tier.
+
+> [!WARNING]
+> The predict-api backend is on Render's free tier, which spins the service down after ~15 minutes
+> of inactivity. The first prediction request after idle time can take **up to ~60 seconds** to
+> wake it back up — the Predict page shows a spinner and waits it out rather than erroring, so if
+> a prediction seems stuck, give it a minute before assuming it's broken. Explore, Model
+> Performance, and About don't call predict-api and load instantly regardless.
+
 ## Table of Contents
 
+- [Live Demo](#live-demo)
 - [Results](#results)
 - [Prediction Targets](#prediction-targets)
 - [Data Sources](#data-sources)
