@@ -182,14 +182,29 @@ def render_mermaid(diagram: str, height: int = 320) -> None:
 
 
 def predict_api_reachable() -> bool:
-    """Short-timeout health probe so the Predict page can degrade gracefully
-    instead of every button click raising/timing out. Explore/Performance/
-    About never call predict-api at all, so they're unaffected either way."""
+    """Health probe so the Predict page can degrade gracefully instead of
+    every button click raising/timing out. Explore/Performance/About never
+    call predict-api at all, so they're unaffected either way.
+
+    Two-stage: a quick 2s check covers the common case (already warm). A
+    free-tier host like Render's spins the service down after ~15min idle
+    and can take 30-60s to cold-start the next request, so a single short
+    timeout would near-permanently report "unreachable" on an idle demo —
+    fall back to a longer wait, with a spinner explaining why, before
+    giving up for real."""
     try:
         resp = requests.get(f"{PREDICT_API_URL}/health", timeout=2)
-        return resp.status_code == 200
+        if resp.status_code == 200:
+            return True
     except requests.RequestException:
-        return False
+        pass
+
+    with st.spinner("Waking up predict-api (free-tier host cold start can take up to a minute)..."):
+        try:
+            resp = requests.get(f"{PREDICT_API_URL}/health", timeout=75)
+            return resp.status_code == 200
+        except requests.RequestException:
+            return False
 
 
 def page_explore(df: pd.DataFrame) -> None:
@@ -268,7 +283,9 @@ def page_predict() -> None:
         st.warning(
             f"predict-api isn't reachable at {PREDICT_API_URL} — the other pages (Explore, "
             "Model Performance, About) don't need it and still work, but predictions need the "
-            "service running. See the README's Quick Start."
+            "service running. If this is the hosted demo, the free-tier host may still be "
+            "cold-starting after this waited up to 75s — try reloading the page in a moment. "
+            "Otherwise see the README's Quick Start."
         )
         return
 
