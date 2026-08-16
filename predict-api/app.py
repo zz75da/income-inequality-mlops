@@ -331,8 +331,13 @@ def root():
             "/predict-gini",
             "/predict-mobility",
             "/predict-income-group",
+            "/explain-gini",
+            "/explain-mobility",
+            "/explain-income-group",
             "/reload-artifacts",
             "/drift-status",
+            "/drift-trigger-report",
+            "/models/registry-status",
             "/health",
         ],
     }
