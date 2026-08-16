@@ -211,14 +211,19 @@ def page_explore(df: pd.DataFrame) -> None:
     st.header("Global income inequality — explore")
 
     latest = df.sort_values("year").groupby("country_code", as_index=False).last()
-    metric = st.selectbox(
-        "Metric",
-        [
-            c
-            for c in ["gini_index", "top10_income_share", "bottom50_income_share", "intergen_income_elasticity"]
-            if c in latest.columns
-        ],
-    )
+    candidate_metrics = ["gini_index", "top10_income_share", "bottom50_income_share", "intergen_income_elasticity"]
+    # A column existing isn't enough — WID.world's public API being retired
+    # (see About page) leaves top10/bottom50_income_share present but 100%
+    # null, which renders as a blank, unexplained map with no color at all.
+    available_metrics = [c for c in candidate_metrics if c in latest.columns and latest[c].notna().any()]
+    unavailable_metrics = [c for c in candidate_metrics if c in latest.columns and c not in available_metrics]
+    metric = st.selectbox("Metric", available_metrics)
+    if unavailable_metrics:
+        st.caption(
+            f"Not shown (no data currently available): {', '.join(unavailable_metrics)} — "
+            "sourced from WID.world, whose public API was retired. See the About page's "
+            "Challenges Solved section."
+        )
     fig = px.choropleth(
         latest,
         locations="country_code",
