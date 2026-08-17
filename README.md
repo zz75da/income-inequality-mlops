@@ -147,6 +147,17 @@ Prometheus/Grafana/Alertmanager aren't just boxes in the diagram either:
 ![Grafana dashboard — request rate, latency, promotion-gate status, and drift](docs/img/grafana_dashboard.png)
 ![Prometheus alert rules, all currently inactive (healthy)](docs/img/prometheus_alerts.png)
 
+The Evidently report the drift gauges above are computed from — each column's reference vs.
+current distribution and its PSI-based drift score, served over HTTP from predict-api's
+`GET /drift-reports/{name}` and embedded in the Streamlit app's Drift Reports page:
+
+![Evidently drift report — dataset drift detected, per-feature PSI breakdown](docs/img/drift_report.png)
+
+(That 80% figure is from repeated identical test payloads used to demo the feature on demand,
+via the Drift Reports page's "Generate report now" button — real traffic diversity would drift
+far fewer columns. Report generation itself is what's being demonstrated here, not this specific
+score.)
+
 ## Design Scope
 
 This project's data is a few thousand country-year rows of tabular macro indicators, refreshed
