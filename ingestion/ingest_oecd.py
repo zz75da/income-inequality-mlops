@@ -78,6 +78,15 @@ def fetch_gini() -> pd.DataFrame:
     df["indicator"] = "gini_index_oecd"
     df["source"] = "oecd"
     df["value"] = pd.to_numeric(df["value"], errors="coerce")
+    # OECD's Income Distribution Database reports Gini on a 0-1 scale (confirmed:
+    # every value in a live pull fell in [0.21, 0.63]) — World Bank and Eurostat,
+    # this pipeline's other two Gini sources, both use the standard 0-100 index.
+    # Without this, merge_sources.py's coalesce (World Bank > OECD > Eurostat)
+    # silently wrote e.g. Germany 2023 as gini_index=0.307 instead of ~30.7 for
+    # any country-year where World Bank had no data and OECD's value was picked —
+    # 26 rows across 8 countries in the current panel, each one training the
+    # model on a wildly wrong target.
+    df["value"] = df["value"] * 100
     return df[["country_code", "country_name", "year", "indicator", "value", "source"]]
 
 

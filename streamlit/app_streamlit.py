@@ -254,6 +254,13 @@ def page_explore(df: pd.DataFrame) -> None:
     st.plotly_chart(fig, use_container_width=True)
 
     st.subheader("Country time series")
+    if metric == "intergen_income_elasticity":
+        st.caption(
+            "Flat by design, not a bug: GDIM publishes one education-based mobility estimate per "
+            "country (its most recent available birth cohort), not an annual series — "
+            "merge_sources.py broadcasts that single value across every year. See the About page's "
+            "Challenges Solved section."
+        )
     countries = sorted(df["country_name"].dropna().unique())
     default_countries = [
         c

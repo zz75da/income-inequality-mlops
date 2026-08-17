@@ -49,9 +49,9 @@ clears its MLflow registry promotion gate (`params.yaml`'s `promotion_gates`, mi
 
 | Target | Metric | Value | Gate | Registry stage |
 |---|---|---|---|---|
-| Gini index | R² | 0.565 | ≥ 0.4 | ✅ Production |
-| Mobility (intergen. elasticity) | R² | 0.350 | ≥ 0.15 | ✅ Production |
-| Income group | Accuracy | 0.992 | ≥ 0.7 | ✅ Production |
+| Gini index | R² | 0.614 | ≥ 0.4 | ✅ Production |
+| Mobility (intergen. elasticity) | R² | 0.358 | ≥ 0.15 | ✅ Production |
+| Income group | Accuracy | 0.991 | ≥ 0.7 | ✅ Production |
 
 All three currently clear their gates and are registered as `Production` versions on DagsHub's
 MLflow registry — but the gate is real, not decorative: a model that doesn't clear its threshold
@@ -95,7 +95,7 @@ keys required (WID.world's public endpoint is currently retired — see Known Li
 | [World Bank Open Data](https://api.worldbank.org/v2/) | Gini index, GDP, unemployment, education/tax/social spending, income-group classification | Public REST API |
 | [OECD Income Distribution Database](https://data-explorer.oecd.org/vis?fs[0]=Topic,1%7CSociety%23SOC%23%7CInequality%23SOC_INE%23&df[id]=DSD_WISE_IDD%40DF_IDD) | Gini index (OECD member countries, alternate methodology) | Public SDMX API |
 | [WID.world](https://wid.world/data/) | Top-10% / bottom-50% pre-tax income shares | Public REST API (currently retired — best-effort, see limitations) |
-| [Eurostat EU-SILC](https://ec.europa.eu/eurostat/web/microdata/collections-research/european-union-statistics-on-income-and-living-conditions) | Gini, S80/S20 ratio, at-risk-of-poverty rate (aggregate indicators only — see limitations) | Public JSON-stat API |
+| [Eurostat EU-SILC](https://ec.europa.eu/eurostat/web/microdata/collections-research/european-union-statistics-on-income-and-living-conditions) | Gini index (aggregate indicator only — see limitations) | Public JSON-stat API |
 | World Bank GDIM | Intergenerational mobility (education-based proxy) | Public file download (data catalog, no auth) |
 
 `ingestion/*.py` each document their exact request shape; `ingestion/merge_sources.py` joins
@@ -369,6 +369,24 @@ tutorial-perfect assumptions:
   whichever one was cached first — only reproducible when the full test suite ran together
   (exactly what CI does), which is why it went unnoticed until CI was fixed and actually ran for
   the first time in this project's history.
+- **OECD's Gini index is on a 0-1 scale; World Bank and Eurostat use 0-100.** `merge_sources.py`'s
+  coalesce (World Bank > OECD > Eurostat) never rescaled it, so any country-year where World Bank
+  had no data silently wrote e.g. Germany 2023 as `gini_index=0.307` instead of ~30.7 — 26 rows
+  across 8 countries, each training the model on a wildly wrong target. Found by actually plotting
+  the Explore page's country time series and noticing a line drop to zero. Fixed in
+  `ingest_oecd.py`; retraining lifted gini's R² from 0.565 to 0.614.
+- **A handful of World Bank fiscal ratios exceeded 100% of GDP** (Sudan 1998-99 hyperinflation,
+  Kuwait 1991's post-Gulf-War GDP collapse, Timor-Leste's oil-fund-dominated economy) — physically
+  impossible for `social_spending_pct_gdp`/`tax_revenue_pct_gdp`, both real training features.
+  `features/schema.py` had range checks for `gini_index`/`unemployment_rate`/etc. but not these
+  two; added `pa.Check.in_range(0, 100)` for both, which drops the ~9 offending rows automatically.
+- **Two Eurostat indicators (S80/S20 income quintile ratio, at-risk-of-poverty rate) had a
+  dimension-flattening bug producing tens of thousands of rows per country across incompatible
+  units** (age/sex/unit variants never filtered down to one canonical series) — one country's
+  "rate" column came out around 14,000-36,000, nonsensical for a value that should be 0-100.
+  Neither was ever used as a model feature or shown anywhere, so removed outright from
+  `ingest_eurostat.py` rather than guessing at the right dimension filter blind. Gini (`ilc_di12`)
+  doesn't have this problem — its response only ever carries one series per country-year.
 
 ## Known Limitations
 

@@ -11,11 +11,10 @@ https://ec.europa.eu/eurostat/web/microdata/collections-research/european-union-
 That microdata is only available under a research-purposes data access
 contract with Eurostat (individual/household-level rows are not exposed via
 the free API). This project therefore uses only Eurostat's published
-*aggregate* indicators (Gini, income quintile share ratio S80/S20, at-risk-
-of-poverty rate) and substitutes the World Bank's income-group classification
-(see ingest_worldbank.py) for the "individual income bracket" style
-classification target, rather than a genuinely per-household bracket, which
-would require that restricted microdata.
+*aggregate* Gini indicator and substitutes the World Bank's income-group
+classification (see ingest_worldbank.py) for the "individual income bracket"
+style classification target, rather than a genuinely per-household bracket,
+which would require that restricted microdata.
 
 Eurostat's `geo` dimension is mostly ISO 3166-1 alpha-2, but not entirely:
 "EL" for Greece and "UK" for the United Kingdom instead of the real ISO codes
@@ -23,6 +22,19 @@ Eurostat's `geo` dimension is mostly ISO 3166-1 alpha-2, but not entirely:
 countries at all. Converted to ISO3 via common.iso2_to_iso3() (with those two
 overrides) so this joins correctly against World Bank/OECD/WID's ISO3 keys in
 merge_sources.py — rows that don't map to a real country are dropped.
+
+KNOWN ISSUE (found 2026-08-17, fixed by removal): this used to also pull
+ilc_di11 (S80/S20 income quintile share ratio) and ilc_li02 (at-risk-of-
+poverty rate). Both datasets carry extra dimensions (age/sex/unit/poverty-
+threshold variant) beyond geo+time that jsonstat_to_df() doesn't filter down
+to a single canonical series, producing tens of thousands of rows per
+country across incompatible units — e.g. Turkiye's at_risk_of_poverty_rate
+came out as ~14000-36000 (nonsensical for a value that should be 0-100).
+ilc_di12 (Gini) doesn't have this problem — its response only ever carries
+one series per geo+time. Neither removed indicator was ever used as a model
+feature or displayed anywhere, so dropping them outright (rather than
+guessing at the right dimension filter without being able to verify it live)
+was the honest fix.
 """
 
 from __future__ import annotations
@@ -38,8 +50,6 @@ BASE_URL = "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data"
 
 DATASETS = {
     "ilc_di12": "gini_index_eurostat",  # Gini coefficient of equivalised disposable income
-    "ilc_di11": "income_quintile_share_ratio",  # S80/S20 ratio
-    "ilc_li02": "at_risk_of_poverty_rate",
 }
 
 # Eurostat-specific deviations from real ISO 3166-1 alpha-2 codes.

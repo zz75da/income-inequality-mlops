@@ -30,6 +30,17 @@ def build_schema(start_year: int, end_year: int) -> pa.DataFrameSchema:
                 float, pa.Check.in_range(0, 100), nullable=True, required=False, coerce=True
             ),
             "population_total": pa.Column(float, pa.Check.ge(0), nullable=True, required=False, coerce=True),
+            # World Bank's own published series for a handful of crisis/structurally-unusual
+            # economies (Sudan 1998-99 hyperinflation, Kuwait 1991 post-Gulf War GDP collapse,
+            # Timor-Leste's oil-fund-dominated GDP) puts these over 100% — a government can't
+            # spend or tax more than its entire economy, so treat those specific rows as bad data
+            # rather than real extremes (unlike gdp_growth_pct, where large swings are plausible).
+            "social_spending_pct_gdp": pa.Column(
+                float, pa.Check.in_range(0, 100), nullable=True, required=False, coerce=True
+            ),
+            "tax_revenue_pct_gdp": pa.Column(
+                float, pa.Check.in_range(0, 100), nullable=True, required=False, coerce=True
+            ),
         },
         strict=False,  # the panel has many more columns than we bother to constrain
     )

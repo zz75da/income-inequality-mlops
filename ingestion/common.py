@@ -42,6 +42,12 @@ def get_with_retry(
         try:
             resp = requests.get(url, params=params, timeout=30, **kwargs)
             resp.raise_for_status()
+            # requests guesses .encoding from the Content-Type header, falling back to
+            # ISO-8859-1 (per HTTP/1.1) when a server doesn't declare a charset — found
+            # via Eurostat's API mangling "Türkiye" to "T?rkiye" in .json()'s decoding
+            # (which reads .text, using that guessed encoding). JSON is UTF-8 by spec
+            # (RFC 8259), so force it rather than trust the guess.
+            resp.encoding = "utf-8"
             return resp
         except requests.RequestException as exc:
             last_exc = exc

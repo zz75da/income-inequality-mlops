@@ -5,8 +5,8 @@ stages:
     deps:
     - path: ingestion/common.py
       hash: md5
-      md5: 87ce25f4e415f6c81d20aad842c94171
-      size: 3289
+      md5: eff382fa974998a2d998ee5c9dd58439
+      size: 3743
     - path: ingestion/ingest_worldbank.py
       hash: md5
       md5: 8867cac2267dfb1c433f338c58f2f9c7
@@ -25,40 +25,40 @@ stages:
     deps:
     - path: ingestion/common.py
       hash: md5
-      md5: 87ce25f4e415f6c81d20aad842c94171
-      size: 3289
+      md5: eff382fa974998a2d998ee5c9dd58439
+      size: 3743
     - path: ingestion/ingest_oecd.py
       hash: md5
-      md5: d1be5fa1d6cec6a043db1d6b47588b7e
-      size: 3954
+      md5: bb205b4596ca101853c700a0b0b4a0d9
+      size: 4595
     outs:
     - path: data/raw/oecd.csv
       hash: md5
-      md5: 89a6f5839f4fd90303c2189e2463ca4d
-      size: 20295
+      md5: e0848779e33ded403c12b5052dac7d5c
+      size: 20493
   ingest_eurostat:
     cmd: python ingestion/ingest_eurostat.py
     deps:
     - path: ingestion/common.py
       hash: md5
-      md5: 87ce25f4e415f6c81d20aad842c94171
-      size: 3289
+      md5: eff382fa974998a2d998ee5c9dd58439
+      size: 3743
     - path: ingestion/ingest_eurostat.py
       hash: md5
-      md5: 5b30b240b07873f103add37b4bfe5317
-      size: 5980
+      md5: e55b3115c8a12251b313eeb83f607470
+      size: 6646
     outs:
     - path: data/raw/eurostat.csv
       hash: md5
-      md5: 444b4721500e6f3d704b8640e3bf1a60
-      size: 54884806
+      md5: c5a9e7c6c1bbe2d81530f3151ffc53bd
+      size: 42154
   ingest_wid:
     cmd: python ingestion/ingest_wid.py
     deps:
     - path: ingestion/common.py
       hash: md5
-      md5: 87ce25f4e415f6c81d20aad842c94171
-      size: 3289
+      md5: eff382fa974998a2d998ee5c9dd58439
+      size: 3743
     - path: ingestion/ingest_wid.py
       hash: md5
       md5: 95873251272d649da90acc5f2b3b2a50
@@ -85,12 +85,12 @@ stages:
     deps:
     - path: data/raw/eurostat.csv
       hash: md5
-      md5: 444b4721500e6f3d704b8640e3bf1a60
-      size: 54884806
+      md5: c5a9e7c6c1bbe2d81530f3151ffc53bd
+      size: 42154
     - path: data/raw/oecd.csv
       hash: md5
-      md5: 89a6f5839f4fd90303c2189e2463ca4d
-      size: 20295
+      md5: e0848779e33ded403c12b5052dac7d5c
+      size: 20493
     - path: data/raw/wid.csv
       hash: md5
       md5: 85364d3abbfdc1aac1fa08bfc44aae93
@@ -110,23 +110,23 @@ stages:
     outs:
     - path: data/processed/merged_panel.csv
       hash: md5
-      md5: 26a492be37645a7e24f0bb36d02f9f5a
-      size: 1467030
+      md5: f869924dd27be9c0a36ca696e2b95cfd
+      size: 1425696
   build_features:
     cmd: python features/build_features.py
     deps:
     - path: data/processed/merged_panel.csv
       hash: md5
-      md5: 26a492be37645a7e24f0bb36d02f9f5a
-      size: 1467030
+      md5: f869924dd27be9c0a36ca696e2b95cfd
+      size: 1425696
     - path: features/build_features.py
       hash: md5
       md5: eba560408499db1968bf7d73b3153a40
       size: 6395
     - path: features/schema.py
       hash: md5
-      md5: 414c4d1fa99317a856876ce9e275ce34
-      size: 1765
+      md5: 3b86c3b4979fbfe6bac1c19404ae0395
+      size: 2558
     - path: params.yaml
       hash: md5
       md5: efae877da6dd717435be9680e7d15080
@@ -138,19 +138,19 @@ stages:
       size: 404
     - path: data/artifacts/feature_medians.json
       hash: md5
-      md5: 6474572286789532f80cf9678c91d75a
+      md5: e90fd2e1bdd1c792e33d03a7fec8d604
       size: 395
     - path: data/processed/features.csv
       hash: md5
-      md5: 85cc721c0b7b547dd254f0dad41cf6eb
-      size: 1718973
+      md5: 3f67ac746813d8161b5ade2898ff7fca
+      size: 1676336
   train_gini:
     cmd: python train-api/services/train_gini.py
     deps:
     - path: data/processed/features.csv
       hash: md5
-      md5: 85cc721c0b7b547dd254f0dad41cf6eb
-      size: 1718973
+      md5: 3f67ac746813d8161b5ade2898ff7fca
+      size: 1676336
     - path: params.yaml
       hash: md5
       md5: efae877da6dd717435be9680e7d15080
@@ -166,19 +166,19 @@ stages:
     outs:
     - path: data/artifacts/metrics_gini.json
       hash: md5
-      md5: bb2f6eb5394a1d35dd768d54e85be488
+      md5: fa9f5c65c6f2861d89d5344628a42f1b
       size: 131
     - path: data/artifacts/model_gini.pkl
       hash: md5
-      md5: 1588c67107ebdf0cf30e3f2182cd1287
-      size: 952363
+      md5: 872d66451f7ab4bcb12a6b9545a7d0bb
+      size: 966099
   train_income_group:
     cmd: python train-api/services/train_income_group.py
     deps:
     - path: data/processed/features.csv
       hash: md5
-      md5: 85cc721c0b7b547dd254f0dad41cf6eb
-      size: 1718973
+      md5: 3f67ac746813d8161b5ade2898ff7fca
+      size: 1676336
     - path: params.yaml
       hash: md5
       md5: efae877da6dd717435be9680e7d15080
@@ -194,19 +194,19 @@ stages:
     outs:
     - path: data/artifacts/metrics_income_group.json
       hash: md5
-      md5: 4e17f5a3068e740faceec02bb85d63a9
+      md5: f91930c634bc41212357fcae8ea28f53
       size: 217
     - path: data/artifacts/model_income_group.pkl
       hash: md5
-      md5: e3d15bcbd1ce47c91974dcc5e80177f1
-      size: 1349846
+      md5: b3e213c60ef1860807ac546a59f6fd2a
+      size: 1352096
   train_mobility:
     cmd: python train-api/services/train_mobility.py
     deps:
     - path: data/processed/features.csv
       hash: md5
-      md5: 85cc721c0b7b547dd254f0dad41cf6eb
-      size: 1718973
+      md5: 3f67ac746813d8161b5ade2898ff7fca
+      size: 1676336
     - path: params.yaml
       hash: md5
       md5: efae877da6dd717435be9680e7d15080
@@ -222,9 +222,9 @@ stages:
     outs:
     - path: data/artifacts/metrics_mobility.json
       hash: md5
-      md5: ce09279a4f9af4ba0a16f1aac0c3b23f
+      md5: 7f52c972513d2e19a4fd10eca316cbe5
       size: 137
     - path: data/artifacts/model_mobility.pkl
       hash: md5
-      md5: 68517a779f8b5882ac8f123a1b5b141e
-      size: 8431098
+      md5: 16059e22a521ea890cdfc5d65fc42145
+      size: 8441829
