@@ -203,6 +203,25 @@ services:
     networks:
       - income_mlops_network
 
+  # === node-exporter (host resource metrics — feeds alert-rules.yml's
+  # DiskSpaceLow rule, which otherwise references node_filesystem_avail_bytes
+  # with nothing ever producing it) ===
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    command:
+      - "--path.rootfs=/host"
+      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
+    # No mount-propagation flag (e.g. rslave) — Docker Desktop's Windows/WSL2
+    # backend rejects it ("path / is mounted on / but it is not a shared or
+    # slave mount"), unlike native Linux. A plain read-only bind still
+    # exposes the filesystem stats DiskSpaceLow needs.
+    volumes:
+      - /:/host:ro
+    restart: unless-stopped
+    networks:
+      - income_mlops_network
+
   # === Alertmanager ===
   alertmanager:
     image: prom/alertmanager:latest

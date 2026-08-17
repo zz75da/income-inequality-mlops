@@ -15,6 +15,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
+from prometheus_client import Gauge
 
 logger = logging.getLogger("predict-api.drift")
 
@@ -22,6 +23,19 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 REPORTS_DIR = ROOT / "data" / "artifacts" / "drift_reports"
 REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 FEATURES_PATH = ROOT / "data" / "processed" / "features.csv"
+
+# Registered on the default registry, same as app.py's PREDICTION_COUNT/
+# PREDICTION_LATENCY, so Instrumentator's expose(app) picks these up for
+# free on the next Prometheus scrape — no pushgateway needed, this process
+# is already scraped directly.
+DRIFT_SHARE = Gauge(
+    "drift_share_of_columns",
+    "Share of features flagged as drifted in the last drift report (Evidently DataDriftPreset)",
+)
+DRIFT_DETECTED = Gauge(
+    "drift_dataset_detected",
+    "1 if the last drift report flagged dataset-level drift, else 0",
+)
 
 _buffer: list[dict] = []
 _lock = threading.Lock()
@@ -79,9 +93,24 @@ def trigger_report(feature_columns: list[str]) -> str | None:
         logger.warning("evidently not installed — skipping drift report generation")
         return None
 
-    cols = [c for c in feature_columns if c in reference.columns and c in current.columns]
+    # A column entirely null in either side (e.g. top10/bottom50_income_share
+    # — WID.world's public API is retired, so the reference sample has zero
+    # real values for them) makes Evidently raise instead of just skipping
+    # it, crashing the whole report.
+    cols = [
+        c
+        for c in feature_columns
+        if c in reference.columns and c in current.columns and reference[c].notna().any() and current[c].notna().any()
+    ]
     report = Report(metrics=[DataDriftPreset()])
     report.run(reference_data=reference[cols], current_data=current[cols])
+
+    try:
+        drift_result = report.as_dict()["metrics"][0]["result"]
+        DRIFT_SHARE.set(drift_result["share_of_drifted_columns"])
+        DRIFT_DETECTED.set(1 if drift_result["dataset_drift"] else 0)
+    except (KeyError, IndexError):
+        logger.warning("Unexpected Evidently report shape — skipping drift gauge update", exc_info=True)
 
     ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     out_path = REPORTS_DIR / f"drift_report_{ts}.html"

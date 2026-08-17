@@ -32,6 +32,154 @@
       "title": "predict-api up",
       "gridPos": { "h": 4, "w": 6, "x": 6, "y": 8 },
       "targets": [{ "expr": "up{job=\"predict-api\"}" }]
+    },
+    {
+      "type": "stat",
+      "title": "predict-api 5xx error rate",
+      "description": "Matches alert-rules.yml's HighPredictionErrorRate threshold (10%).",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 10 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "100 * sum(rate(http_requests_total{job=\"predict-api\", status=~\"5..\"}[5m])) / sum(rate(http_requests_total{job=\"predict-api\"}[5m]))"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Root filesystem free",
+      "description": "Matches alert-rules.yml's DiskSpaceLow threshold (10%).",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 10 },
+              { "color": "green", "value": 20 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "100 * node_filesystem_avail_bytes{mountpoint=\"/\"} / node_filesystem_size_bytes{mountpoint=\"/\"}"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Model quality (last training run vs. promotion gate)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 12 }
+    },
+    {
+      "type": "stat",
+      "title": "Gini R² (gate: ≥ 0.4)",
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 13 },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 0.4 }
+            ]
+          }
+        }
+      },
+      "targets": [{ "expr": "model_final_r2{target=\"gini\"}" }]
+    },
+    {
+      "type": "stat",
+      "title": "Mobility R² (gate: ≥ 0.15)",
+      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 13 },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 0.15 }
+            ]
+          }
+        }
+      },
+      "targets": [{ "expr": "model_final_r2{target=\"mobility\"}" }]
+    },
+    {
+      "type": "stat",
+      "title": "Income group accuracy (gate: ≥ 0.7)",
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 13 },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 0.7 }
+            ]
+          }
+        }
+      },
+      "targets": [{ "expr": "model_final_accuracy{target=\"income_group\"}" }]
+    },
+    {
+      "type": "row",
+      "title": "Prediction drift (vs. training reference sample)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 }
+    },
+    {
+      "type": "stat",
+      "title": "Share of features drifted",
+      "description": "predict-api's own /metrics — updated each time a drift report is triggered (POST /drift-trigger-report).",
+      "gridPos": { "h": 4, "w": 12, "x": 0, "y": 18 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 0.5 }
+            ]
+          }
+        }
+      },
+      "targets": [{ "expr": "drift_share_of_columns" }]
+    },
+    {
+      "type": "stat",
+      "title": "Dataset-level drift detected",
+      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 18 },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "No" }, "1": { "text": "Yes" } } }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        }
+      },
+      "targets": [{ "expr": "drift_dataset_detected" }]
     }
   ]
 }
