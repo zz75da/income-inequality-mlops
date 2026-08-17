@@ -656,6 +656,35 @@ def page_drift() -> None:
         return
 
     try:
+        status_resp = requests.get(f"{PREDICT_API_URL}/drift-status", timeout=10)
+        status_resp.raise_for_status()
+        buffered = status_resp.json().get("buffer_size", 0)
+    except requests.RequestException:
+        buffered = 0
+
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.caption(
+            f"{buffered} prediction(s) buffered since the last report — auto-generates once the "
+            "configured threshold is reached (params.yaml's monitoring.drift_reference_min_rows)."
+        )
+    with col2:
+        if st.button(
+            "Generate report now",
+            help="Build a report from whatever's buffered so far, regardless of the threshold — useful for a demo instead of waiting on organic traffic.",
+        ):
+            try:
+                trigger_resp = requests.post(f"{PREDICT_API_URL}/drift-trigger-report", timeout=60)
+                if trigger_resp.status_code == 400:
+                    st.warning("Nothing buffered yet — make at least one prediction on the Predict page first.")
+                else:
+                    trigger_resp.raise_for_status()
+                    st.success("Report generated.")
+                    st.rerun()
+            except requests.RequestException as e:
+                st.error(f"Failed to trigger a drift report: {e}")
+
+    try:
         resp = requests.get(f"{PREDICT_API_URL}/drift-reports", timeout=10)
         resp.raise_for_status()
         reports = resp.json().get("reports", [])

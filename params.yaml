@@ -83,5 +83,11 @@ promotion_gates:
     min: 0.7
 
 monitoring:
-  drift_reference_min_rows: 100
+  # Low enough that a portfolio demo's organic traffic can realistically
+  # reach it (100 was effectively unreachable without deliberately curling
+  # predict-api 100 times — a recruiter clicking through the Predict page
+  # would never see a drift report auto-generate). The Streamlit Drift
+  # Reports page also has a manual "Trigger now" button for immediate
+  # demonstration regardless of buffer size.
+  drift_reference_min_rows: 20
   drift_psi_threshold: 0.2   # population stability index alert threshold per feature
