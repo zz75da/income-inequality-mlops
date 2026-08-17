@@ -9,7 +9,7 @@ on:
 
 jobs:
   lint:
-    name: Lint & Format (ruff)
+    name: Lint, Format & Types
     runs-on: ubuntu-latest
 
     steps:
@@ -30,6 +30,9 @@ jobs:
 
       - name: ruff format --check
         run: ruff format --check .
+
+      - name: mypy
+        run: mypy
 
   security:
     name: Dependency Vulnerability Scan

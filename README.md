@@ -50,8 +50,8 @@ clears its MLflow registry promotion gate (`params.yaml`'s `promotion_gates`, mi
 | Target | Metric | Value | Gate | Registry stage |
 |---|---|---|---|---|
 | Gini index | R² | 0.565 | ≥ 0.4 | ✅ Production |
-| Mobility (intergen. elasticity) | R² | 0.339 | ≥ 0.15 | ✅ Production |
-| Income group | Accuracy | 0.991 | ≥ 0.7 | ✅ Production |
+| Mobility (intergen. elasticity) | R² | 0.350 | ≥ 0.15 | ✅ Production |
+| Income group | Accuracy | 0.992 | ≥ 0.7 | ✅ Production |
 
 All three currently clear their gates and are registered as `Production` versions on DagsHub's
 MLflow registry — but the gate is real, not decorative: a model that doesn't clear its threshold
@@ -296,7 +296,7 @@ income-inequality-mlops/
 ├── dvc.yaml                         # ingest -> merge -> features (pandera-validated) -> train x3
 ├── params.yaml                      # hyperparameters, feature list, promotion_gates
 └── docker-compose.yml               # postgres, airflow, train-api, predict-api, streamlit,
-                                      # prometheus, grafana, alertmanager, pushgateway
+                                      # prometheus, grafana, alertmanager, pushgateway, node-exporter
 ```
 
 ## Environment Variables
@@ -307,18 +307,20 @@ Airflow Fernet/secret keys, Grafana admin password, optional WID API key).
 ## Engineering Hygiene
 
 ```bash
-make install-dev       # ruff, mypy, pre-commit, pip-audit, shap, kaleido
+make install-dev       # ruff, mypy + type stubs, pre-commit, pip-audit, shap, kaleido
 make lint-ruff          # ruff check .
+make lint-mypy          # mypy (scoped — see below)
 make format             # ruff format .
 make security           # pip-audit across every requirements*.txt
 make precommit-install  # wire the hooks above into git commit
 ```
 
-CI runs `ruff check`/`ruff format --check` and `pip-audit` as independent jobs alongside the test
-suite (`.github/workflows/ci.yml`). `[tool.mypy]` in `pyproject.toml` is scoped to the modules
-added in this pass (`features/schema.py`, `predict-api/services/explain.py`) rather than a
-full-repo retrofit — annotating the ~20 pre-existing untyped files wasn't worth it relative to the
-payoff; new modules are written with type hints from the start and checked here.
+CI runs `ruff check`/`ruff format --check`, `mypy`, and `pip-audit` as independent jobs alongside
+the test suite (`.github/workflows/ci.yml`). `[tool.mypy]` in `pyproject.toml` is scoped to the
+modules added in this pass (`features/schema.py`, `predict-api/services/explain.py`,
+`predict-api/services/drift_monitor.py`) rather than a full-repo retrofit — annotating the ~20
+pre-existing untyped files wasn't worth it relative to the payoff; new modules are written with
+type hints from the start and checked here.
 
 ## Challenges Solved
 

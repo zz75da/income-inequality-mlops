@@ -1,8 +1,8 @@
 """
 Income Inequality MLOps — scheduled ingestion + retrain DAG.
 
-Unlike the Rakuten project (real-time product catalog, retrained on
-demand), the four data sources here (World Bank, OECD, Eurostat, WID) each
+Unlike a real-time product-catalog pipeline retrained on demand, the four
+data sources here (World Bank, OECD, Eurostat, WID) each
 publish new figures on their own annual/biennial release calendars. This DAG
 therefore runs on a conservative monthly schedule and simply no-ops
 usefully (re-pulls return mostly unchanged data) between real upstream

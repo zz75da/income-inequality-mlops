@@ -9,8 +9,7 @@ receivers:
   - name: default
     # Wire up an email or webhook receiver here — left as a no-op by default
     # so the stack runs out of the box without credentials. Example email
-    # config (uncomment and fill in via env substitution or a templated file
-    # like rakuten_mlops_services/monitoring/alertmanager.yml.tmpl):
+    # config (uncomment and fill in via env substitution or a templated file):
     #
     # email_configs:
     #   - to: "you@example.com"

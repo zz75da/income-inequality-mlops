@@ -1,10 +1,11 @@
 """
-Lightweight Evidently-based drift monitor for predict-api, adapted from
-rakuten_mlops_services' buffer-then-report pattern but simplified for a
-low-QPS tabular API (portfolio-project traffic, not production scale):
-buffers incoming feature rows, and once params.yaml's
-monitoring.drift_reference_min_rows is reached compares the buffer against a
-reference sample built from data/processed/features.csv at startup.
+Lightweight Evidently-based drift monitor for predict-api: buffers incoming
+feature rows in memory, and once params.yaml's monitoring.drift_reference_min_rows
+is reached, auto-generates an HTML report comparing the buffer against a
+reference sample lazily read from data/processed/features.csv (and dropped
+on /reload-artifacts so it tracks the current model's training data, not
+whatever features.csv looked like at first use). Simplified for a low-QPS
+tabular API — portfolio-project traffic, not production scale.
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
+import yaml
 from prometheus_client import Gauge
 
 logger = logging.getLogger("predict-api.drift")
@@ -23,6 +25,11 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 REPORTS_DIR = ROOT / "data" / "artifacts" / "drift_reports"
 REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 FEATURES_PATH = ROOT / "data" / "processed" / "features.csv"
+
+with open(ROOT / "params.yaml") as _f:
+    _PARAMS = yaml.safe_load(_f)
+DRIFT_REFERENCE_MIN_ROWS = _PARAMS["monitoring"]["drift_reference_min_rows"]
+DRIFT_PSI_THRESHOLD = _PARAMS["monitoring"]["drift_psi_threshold"]
 
 # Registered on the default registry, same as app.py's PREDICTION_COUNT/
 # PREDICTION_LATENCY, so Instrumentator's expose(app) picks these up for
@@ -54,9 +61,31 @@ def _load_reference() -> pd.DataFrame | None:
     return _reference_df
 
 
+def refresh_reference() -> None:
+    """Drop the cached reference sample so the next drift report re-reads
+    features.csv from disk. Without this, a long-running predict-api process
+    keeps comparing against whatever features.csv looked like at the first
+    prediction after startup — even though training regenerates it on every
+    Airflow run and POST /reload-artifacts fires right after. Called from
+    app.py's /reload-artifacts so the drift reference actually tracks what
+    the current model was trained on."""
+    global _reference_df
+    _reference_df = None
+
+
 def record_prediction(features: dict) -> None:
     with _lock:
         _buffer.append(features)
+    # Auto-trigger once the buffer reaches params.yaml's configured minimum —
+    # previously this threshold was declared but never actually read
+    # anywhere, so a report only ever got built via a manual POST
+    # /drift-trigger-report call; the buffer would otherwise grow forever
+    # and the Streamlit Drift Reports page's "generates one once the buffer
+    # fills up" message was simply false. Run inline rather than in a
+    # background thread — low-QPS portfolio traffic, consistent with this
+    # service's "kept deliberately simple" scope (see README's Design Scope).
+    if buffer_size() >= DRIFT_REFERENCE_MIN_ROWS:
+        trigger_report(list(features.keys()))
 
 
 def buffer_size() -> int:
@@ -102,7 +131,11 @@ def trigger_report(feature_columns: list[str]) -> str | None:
         for c in feature_columns
         if c in reference.columns and c in current.columns and reference[c].notna().any() and current[c].notna().any()
     ]
-    report = Report(metrics=[DataDriftPreset()])
+    # params.yaml's drift_psi_threshold was declared but never actually
+    # wired to a stattest before — explicitly use PSI (rather than
+    # Evidently's default per-column-type heuristic test) so that config
+    # value has a real effect.
+    report = Report(metrics=[DataDriftPreset(stattest="psi", stattest_threshold=DRIFT_PSI_THRESHOLD)])
     report.run(reference_data=reference[cols], current_data=current[cols])
 
     try:

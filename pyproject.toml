@@ -16,5 +16,6 @@ python_version = "3.11"
 ignore_missing_imports = true
 files = [
     "predict-api/services/explain.py",
+    "predict-api/services/drift_monitor.py",
     "features/schema.py",
 ]

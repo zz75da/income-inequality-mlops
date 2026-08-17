@@ -38,7 +38,7 @@ from fastapi import FastAPI, HTTPException
 from prometheus_client import Counter, Histogram
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel
-from services.drift_monitor import buffer_size, record_prediction, reference_exists, trigger_report
+from services.drift_monitor import buffer_size, record_prediction, reference_exists, refresh_reference, trigger_report
 from services.explain import build_explainers, explain
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -301,6 +301,7 @@ def models_registry_status():
 @app.post("/reload-artifacts")
 def reload_artifacts():
     load_artifacts()
+    refresh_reference()
     return {"status": "reloaded", "models_loaded": list(_models.keys())}
 
 

@@ -1,5 +1,5 @@
 services:
-  # === Postgres — Airflow metadata DB (MLflow tracking lives on DagsHub, same as rakuten_mlops_services) ===
+  # === Postgres — Airflow metadata DB (MLflow tracking lives on DagsHub, not here) ===
   postgres:
     image: postgres:13
     container_name: postgres

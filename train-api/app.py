@@ -4,9 +4,8 @@
 # ------------------------------------------------------------
 # Role: FastAPI service that runs the ingestion -> feature ->
 # train pipeline for the three prediction targets (gini,
-# mobility, income_group) as background jobs, mirroring the
-# async job pattern from the Rakuten train-api (POST returns a
-# job_id immediately; poll GET /train/status/{id}).
+# mobility, income_group) as background jobs: POST returns a
+# job_id immediately; poll GET /train/status/{id}.
 #
 # Endpoints:
 #   POST /train              {"target": "gini|mobility|income_group|all",

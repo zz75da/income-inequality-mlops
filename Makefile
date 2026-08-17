@@ -2,7 +2,7 @@
 COMPOSE = docker compose
 
 .PHONY: up down logs restart build ingest features train test lint dvc-repro dvc-push observability grafana-dash \
-        install-dev format lint-ruff precommit-install security
+        install-dev format lint-ruff lint-mypy precommit-install security
 
 # --- Full stack ---
 up:
@@ -55,6 +55,9 @@ format:
 
 lint-ruff:
 	ruff check .
+
+lint-mypy:
+	mypy
 
 precommit-install:
 	pre-commit install

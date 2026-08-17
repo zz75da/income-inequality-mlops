@@ -2,6 +2,7 @@
 # the root requirements.txt already sits outside every Dockerfile's install path).
 ruff==0.6.9
 mypy==1.11.2
+types-PyYAML==6.0.12.20240808  # mypy stub for drift_monitor.py's `import yaml`
 pre-commit==3.8.0
 pip-audit==2.7.3
 shap==0.46.0
