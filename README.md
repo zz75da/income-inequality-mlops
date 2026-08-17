@@ -59,6 +59,14 @@ stays in `Staging` (still trained, logged, and registered — just not served as
 version) rather than being rubber-stamped into production. See the Streamlit app's Model
 Performance page for live status, or `GET /models/registry-status` on predict-api.
 
+![Model quality vs. promotion gate, per target](docs/img/model_performance_gates.png)
+
+The Predict page doesn't just return a number — every regression prediction ships an 80% confidence
+interval plus a live SHAP breakdown of which features pushed it up or down (from an actual
+`/explain-gini` call against the trained model, not a mockup):
+
+![SHAP explanation for a live Gini index prediction](docs/img/predict_shap_explanation.png)
+
 ![Latest Gini index by country](docs/img/explore_choropleth.png)
 
 ## Prediction Targets
