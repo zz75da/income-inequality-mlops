@@ -59,6 +59,8 @@ stays in `Staging` (still trained, logged, and registered — just not served as
 version) rather than being rubber-stamped into production. See the Streamlit app's Model
 Performance page for live status, or `GET /models/registry-status` on predict-api.
 
+![DagsHub Model Registry — three registered models](docs/img/dagshub_registry.png)
+
 ![Model quality vs. promotion gate, per target](docs/img/model_performance_gates.png)
 
 The Predict page doesn't just return a number — every regression prediction ships an 80% confidence
@@ -134,6 +136,16 @@ flowchart LR
 
 MLflow experiment tracking + model registry runs on DagsHub, not as a local container. DVC
 versions `data/raw` and `data/artifacts` against the same DagsHub S3-compatible remote.
+
+The diagram above is the design — this is the same pipeline as DVC/DagsHub actually see it,
+auto-generated from `dvc.yaml`'s real dependency graph, not redrawn by hand:
+
+![DVC pipeline DAG, as rendered by DagsHub](docs/img/dvc_dag.png)
+
+Prometheus/Grafana/Alertmanager aren't just boxes in the diagram either:
+
+![Grafana dashboard — request rate, latency, promotion-gate status, and drift](docs/img/grafana_dashboard.png)
+![Prometheus alert rules, all currently inactive (healthy)](docs/img/prometheus_alerts.png)
 
 ## Design Scope
 
