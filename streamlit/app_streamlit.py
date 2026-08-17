@@ -42,17 +42,31 @@ import streamlit.components.v1 as components
 st.set_page_config(page_title="Income Inequality MLOps", layout="wide", page_icon="📊")
 
 
+# The two paths Streamlit itself checks for a secrets file (confirmed from
+# its own "No secrets files found" message) — probed directly so _config()
+# below can skip st.secrets entirely when neither exists. st.secrets doesn't
+# raise when the file is missing (a try/except can't catch it); it renders a
+# "No secrets files found" warning banner into the app as a side effect of
+# the lazy-load on first access, once per _config() call — which is exactly
+# what showed up 4 times on a local run with no secrets.toml.
+_SECRETS_PATHS = (
+    Path.home() / ".streamlit" / "secrets.toml",
+    Path(__file__).resolve().parent / ".streamlit" / "secrets.toml",
+)
+
+
 def _config(key: str, default: str) -> str:
     """Read a config value from Streamlit Cloud's secrets manager first (its
     Secrets UI populates st.secrets, not necessarily plain OS environment
     variables), falling back to a real env var (docker-compose/local run),
     then the given default."""
-    try:
-        value = st.secrets.get(key)
-        if value:
-            return value
-    except Exception:
-        pass
+    if any(p.exists() for p in _SECRETS_PATHS):
+        try:
+            value = st.secrets.get(key)
+            if value:
+                return value
+        except Exception:
+            pass
     return os.getenv(key, default)
 
 
@@ -101,11 +115,13 @@ def _try_dvc_pull_from_secrets() -> None:
     """
     import subprocess
 
+    if not any(p.exists() for p in _SECRETS_PATHS):
+        return  # no secrets.toml at all — skip st.secrets to avoid its "No secrets files found" banner
     try:
         user = st.secrets.get("DAGSHUB_USER")
         token = st.secrets.get("DAGSHUB_TOKEN")
     except Exception:
-        return  # no st.secrets configured (e.g. local run without secrets.toml)
+        return
     if not user or not token:
         return
 
