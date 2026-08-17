@@ -243,6 +243,10 @@ POST /explain-income-group    {feature fields...} -> {"contributions": {...}, "e
 POST /reload-artifacts        (reload models after a training run)
 GET  /drift-status
 POST /drift-trigger-report
+GET  /drift-reports           -> {"reports": [filename, ...]}  (newest first)
+GET  /drift-reports/{name}    -> the report's HTML (served over HTTP, not read off local disk —
+                                predict-api and the Streamlit frontend run on separate hosts with
+                                no shared filesystem on a real deployment)
 GET  /models/registry-status  (MLflow registry stage/version per target, read from a local file —
                                 no live mlflow dependency in this service)
 GET  /health

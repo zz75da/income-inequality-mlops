@@ -11,6 +11,7 @@ tabular API — portfolio-project traffic, not production scale.
 from __future__ import annotations
 
 import logging
+import re
 import threading
 from datetime import UTC, datetime
 from pathlib import Path
@@ -102,6 +103,32 @@ def _prune_old_reports() -> None:
     while len(reports) > MAX_REPORTS_KEPT:
         oldest = reports.pop(0)
         oldest.unlink(missing_ok=True)
+
+
+REPORT_NAME_PATTERN = re.compile(r"^drift_report_\d{8}T\d{6}Z\.html$")
+
+
+def list_reports() -> list[str]:
+    """Newest first — served over HTTP (GET /drift-reports) so Streamlit
+    Cloud can list them. predict-api and the Streamlit frontend run on
+    separate hosts (Render / Streamlit Cloud) with no shared filesystem —
+    reading REPORTS_DIR locally, which is all the Streamlit app used to do,
+    only ever worked in docker-compose where both containers bind-mount the
+    same ./data directory."""
+    return [p.name for p in sorted(REPORTS_DIR.glob("drift_report_*.html"), reverse=True)]
+
+
+def get_report_html(name: str) -> str | None:
+    """Read one report's HTML by filename (GET /drift-reports/{name}).
+    Validates against REPORT_NAME_PATTERN first — name comes straight from a
+    URL path parameter, and without this a caller could pass `../../` style
+    input and read arbitrary files off the container."""
+    if not REPORT_NAME_PATTERN.match(name):
+        return None
+    path = REPORTS_DIR / name
+    if not path.exists():
+        return None
+    return path.read_text(encoding="utf-8")
 
 
 def trigger_report(feature_columns: list[str]) -> str | None:

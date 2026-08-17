@@ -19,6 +19,10 @@
 #   POST /reload-artifacts        (reload models from disk after a training run)
 #   GET  /drift-status
 #   POST /drift-trigger-report
+#   GET  /drift-reports           (list report filenames, newest first)
+#   GET  /drift-reports/{name}    (one report's HTML — served over HTTP since
+#                                  predict-api and the Streamlit frontend run
+#                                  on separate hosts with no shared filesystem)
 #   GET  /models/registry-status  (MLflow registry stage/version per target, if trained)
 #   GET  /health
 #   GET  /metrics
@@ -35,10 +39,19 @@ import numpy as np
 import pandas as pd
 import yaml
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
 from prometheus_client import Counter, Histogram
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel
-from services.drift_monitor import buffer_size, record_prediction, reference_exists, refresh_reference, trigger_report
+from services.drift_monitor import (
+    buffer_size,
+    get_report_html,
+    list_reports,
+    record_prediction,
+    reference_exists,
+    refresh_reference,
+    trigger_report,
+)
 from services.explain import build_explainers, explain
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -319,6 +332,19 @@ def drift_trigger_report():
     return {"report_path": path}
 
 
+@app.get("/drift-reports")
+def drift_reports():
+    return {"reports": list_reports()}
+
+
+@app.get("/drift-reports/{name}", response_class=HTMLResponse)
+def drift_report(name: str):
+    html = get_report_html(name)
+    if html is None:
+        raise HTTPException(status_code=404, detail="No such drift report")
+    return html
+
+
 @app.get("/health")
 def health():
     return {"status": "healthy", "service": "predict-api", "models_loaded": list(_models.keys())}
@@ -338,6 +364,7 @@ def root():
             "/reload-artifacts",
             "/drift-status",
             "/drift-trigger-report",
+            "/drift-reports",
             "/models/registry-status",
             "/health",
         ],
