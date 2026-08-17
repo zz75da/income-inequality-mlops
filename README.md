@@ -23,6 +23,14 @@ Streamlit Cloud frontend, calling a predict-api instance hosted on Render's free
 > a prediction seems stuck, give it a minute before assuming it's broken. Explore, Model
 > Performance, and About don't call predict-api and load instantly regardless.
 
+![Predict page — point predictions with 80% confidence intervals and a class-probability table](docs/img/predict_page.png)
+
+![Explore page — intergenerational mobility by country](docs/img/explore_page.png)
+
+The flat multi-year lines above aren't a bug: GDIM publishes one education-based mobility estimate
+per country (its most recent available birth cohort), not an annual series, so the same value
+repeats across every year. The Streamlit app surfaces this directly as a caption on that metric.
+
 ## Table of Contents
 
 - [Live Demo](#live-demo)
