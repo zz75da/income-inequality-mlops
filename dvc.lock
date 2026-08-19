@@ -200,6 +200,10 @@ stages:
       hash: md5
       md5: b3e213c60ef1860807ac546a59f6fd2a
       size: 1352096
+    - path: data/artifacts/registry_status.json
+      hash: md5
+      md5: b47473502fdb327e368959d333f6a433
+      size: 908
   train_mobility:
     cmd: python train-api/services/train_mobility.py
     deps:

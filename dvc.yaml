@@ -132,5 +132,17 @@ stages:
       - params.yaml
     outs:
       - data/artifacts/model_income_group.pkl
+      # registry_status.json is incrementally read-modify-written by all 4
+      # train_*.py scripts (each only touches its own key), so it can't
+      # cleanly be "owned" by one stage the way a normal DVC output is —
+      # declared on the last stage in the natural training sequence
+      # (train-api's TARGET_SCRIPTS order) so a full run captures the
+      # complete file. Without this it was never pushed to DagsHub at all,
+      # so predict-api's GET /models/registry-status and the Streamlit
+      # Model Performance page's registry badge silently returned nothing
+      # on a real hosted deploy (Render/Streamlit Cloud) — found by actually
+      # curling the live Render service, not by local testing, since local
+      # docker-compose shares data/ via a volume mount that masks this.
+      - data/artifacts/registry_status.json
     metrics:
       - data/artifacts/metrics_income_group.json
