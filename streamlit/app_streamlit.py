@@ -106,26 +106,33 @@ TARGETS = {
 }
 
 
-def _try_dvc_pull_from_secrets() -> None:
+@st.cache_resource
+def _try_dvc_pull_from_secrets() -> str:
     """Cold-start bootstrap for a hosted deploy (e.g. Streamlit Community
     Cloud): data/ is DVC-tracked, not committed, so a fresh checkout has no
     features.csv. If DagsHub credentials are configured in the platform's
-    secrets manager, attempt a `dvc pull` before giving up — best-effort,
-    silent on failure (the caller's existing "run the pipeline first"
-    warning covers that case either way). No-op locally/in Docker, where
-    features.csv already exists and this is never reached.
+    secrets manager, attempt a `dvc pull` before giving up.
+
+    Returns a short human-readable outcome string instead of failing purely
+    silently — the two hosted-deploy bugs found in this bootstrap so far
+    (missing `git init`, and this one) were both invisible in the app itself,
+    only visible in a platform log the user had to go dig up. Callers show
+    this in the UI so a repeat failure is diagnosable from the app directly.
+    `@st.cache_resource` (not `@st.cache_data` — this isn't picklable-data,
+    it's an action) makes every caller in the same session share one attempt
+    instead of each page re-running dvc pull independently.
     """
     import subprocess
 
     if not any(p.exists() for p in _SECRETS_PATHS):
-        return  # no secrets.toml at all — skip st.secrets to avoid its "No secrets files found" banner
+        return "no secrets.toml found on this host — st.secrets was never touched"
     try:
         user = st.secrets.get("DAGSHUB_USER")
         token = st.secrets.get("DAGSHUB_TOKEN")
-    except Exception:
-        return
+    except Exception as exc:
+        return f"reading st.secrets raised {type(exc).__name__}: {exc}"
     if not user or not token:
-        return
+        return "DAGSHUB_USER/DAGSHUB_TOKEN not set in this app's Secrets (Settings -> Secrets)"
 
     try:
         # dvc pull needs a .git directory to satisfy its SCM layer (this
@@ -153,9 +160,16 @@ def _try_dvc_pull_from_secrets() -> None:
             capture_output=True,
             timeout=30,
         )
-        subprocess.run(["dvc", "pull"], cwd=str(ROOT), check=True, capture_output=True, timeout=120)
-    except Exception:
+        result = subprocess.run(["dvc", "pull"], cwd=str(ROOT), check=True, capture_output=True, timeout=170, text=True)
+        logging.getLogger("streamlit.bootstrap").info("dvc pull succeeded: %s", result.stdout[-500:])
+        return "dvc pull succeeded"
+    except subprocess.CalledProcessError as exc:
+        detail = f"`{' '.join(exc.cmd)}` exited {exc.returncode}: {(exc.stderr or exc.stdout or '')[-500:]}"
+        logging.getLogger("streamlit.bootstrap").warning("dvc pull bootstrap failed: %s", detail)
+        return detail
+    except Exception as exc:
         logging.getLogger("streamlit.bootstrap").warning("dvc pull bootstrap failed", exc_info=True)
+        return f"{type(exc).__name__}: {exc}"
 
 
 @st.cache_data(ttl=300)
@@ -460,6 +474,13 @@ def _gate_status_badge(passed: bool) -> str:
 def page_performance() -> None:
     st.header("Model Performance")
     st.caption("Reads local training artifacts directly — works even if predict-api is down.")
+
+    if not (ARTIFACTS_DIR / "metrics_gini.json").exists():
+        # This page never used to attempt the cold-start pull itself — it only
+        # ever worked if something else (e.g. visiting Explore first) had
+        # already triggered it as a side effect. A visitor landing here first
+        # got a permanent "hasn't been trained yet" with no way to recover.
+        st.caption(f"Cold-start data pull: {_try_dvc_pull_from_secrets()}")
 
     params = load_params()
     gates = params.get("promotion_gates", {}) if params else {}
@@ -775,6 +796,7 @@ def main() -> None:
                 "data/processed/features.csv not found — run the ingestion + feature pipeline first "
                 "(`make ingest && make features`)."
             )
+            st.caption(f"Cold-start data pull: {_try_dvc_pull_from_secrets()}")
         else:
             page_explore(df)
     elif page == "Predict":
