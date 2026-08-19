@@ -128,6 +128,17 @@ def _try_dvc_pull_from_secrets() -> None:
         return
 
     try:
+        # dvc pull needs a .git directory to satisfy its SCM layer (this
+        # project's .dvc/config was created via a normal git-tracked `dvc
+        # init`, not --no-scm) — errors "not a git repository" without one.
+        # Streamlit Cloud, like Render, deploys from a checkout that doesn't
+        # include .git — confirmed by predict-api/app.py's identical bootstrap
+        # hitting this exact failure on Render earlier. A bare `git init` at
+        # runtime satisfies DVC's check just as well; it only needs a .git
+        # directory to exist, not any actual history.
+        if not (ROOT / ".git").exists():
+            subprocess.run(["git", "init"], cwd=str(ROOT), check=True, capture_output=True, timeout=30)
+
         subprocess.run(
             ["dvc", "remote", "modify", "origin", "--local", "access_key_id", token],
             cwd=str(ROOT),
