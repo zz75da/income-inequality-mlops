@@ -129,8 +129,8 @@ stages:
       size: 2558
     - path: params.yaml
       hash: md5
-      md5: efae877da6dd717435be9680e7d15080
-      size: 3277
+      md5: e171ad0c1b83673d82394a848844d1e2
+      size: 3544
     outs:
     - path: data/artifacts/categorical_mappings.json
       hash: md5
@@ -153,8 +153,8 @@ stages:
       size: 1676336
     - path: params.yaml
       hash: md5
-      md5: efae877da6dd717435be9680e7d15080
-      size: 3277
+      md5: e171ad0c1b83673d82394a848844d1e2
+      size: 3544
     - path: train-api/services/common.py
       hash: md5
       md5: 7163913d6e3c322bba8ca80b23472987
@@ -181,8 +181,8 @@ stages:
       size: 1676336
     - path: params.yaml
       hash: md5
-      md5: efae877da6dd717435be9680e7d15080
-      size: 3277
+      md5: e171ad0c1b83673d82394a848844d1e2
+      size: 3544
     - path: train-api/services/common.py
       hash: md5
       md5: 7163913d6e3c322bba8ca80b23472987
@@ -209,8 +209,8 @@ stages:
       size: 1676336
     - path: params.yaml
       hash: md5
-      md5: efae877da6dd717435be9680e7d15080
-      size: 3277
+      md5: e171ad0c1b83673d82394a848844d1e2
+      size: 3544
     - path: train-api/services/common.py
       hash: md5
       md5: 7163913d6e3c322bba8ca80b23472987
@@ -228,3 +228,31 @@ stages:
       hash: md5
       md5: 16059e22a521ea890cdfc5d65fc42145
       size: 8441829
+  train_mobility_rank:
+    cmd: python train-api/services/train_mobility_rank.py
+    deps:
+    - path: data/processed/features.csv
+      hash: md5
+      md5: 3f67ac746813d8161b5ade2898ff7fca
+      size: 1676336
+    - path: params.yaml
+      hash: md5
+      md5: e171ad0c1b83673d82394a848844d1e2
+      size: 3544
+    - path: train-api/services/common.py
+      hash: md5
+      md5: 7163913d6e3c322bba8ca80b23472987
+      size: 6958
+    - path: train-api/services/train_mobility_rank.py
+      hash: md5
+      md5: 46bc8ebfe2b629a1152742fafc0553c5
+      size: 2945
+    outs:
+    - path: data/artifacts/metrics_mobility_rank.json
+      hash: md5
+      md5: efa748e591fa1db58e2312a20df160f9
+      size: 138
+    - path: data/artifacts/model_mobility_rank.pkl
+      hash: md5
+      md5: 32b23919580679ab4c29d4f0e634ea31
+      size: 6635238

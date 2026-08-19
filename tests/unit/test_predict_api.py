@@ -26,13 +26,18 @@ def client(monkeypatch, import_service_app):
         {
             "gini": DummyRegressor(),
             "mobility": DummyRegressor(),
+            "mobility_rank": DummyRegressor(),
             "income_group": {"model": DummyClassifier(), "label_encoder": DummyLabelEncoder()},
         },
     )
     monkeypatch.setattr(
         predict_app, "_categorical_mappings", {"region": {"Europe": 0}, "income_group_lag1": {"UNKNOWN": 0}}
     )
-    monkeypatch.setattr(predict_app, "_metrics", {"gini": {"residual_std": 5.0}, "mobility": {"residual_std": 0.1}})
+    monkeypatch.setattr(
+        predict_app,
+        "_metrics",
+        {"gini": {"residual_std": 5.0}, "mobility": {"residual_std": 0.1}, "mobility_rank": {"residual_std": 0.2}},
+    )
     monkeypatch.setattr(predict_app, "record_prediction", lambda *a, **k: None)
 
     return TestClient(predict_app.app)
@@ -43,7 +48,7 @@ def test_health(client):
     assert resp.status_code == 200
     body = resp.json()
     assert body["status"] == "healthy"
-    assert set(body["models_loaded"]) == {"gini", "mobility", "income_group"}
+    assert set(body["models_loaded"]) == {"gini", "mobility", "mobility_rank", "income_group"}
 
 
 def test_predict_gini(client):
@@ -60,6 +65,14 @@ def test_predict_mobility(client):
     body = resp.json()
     assert body["intergen_income_elasticity"] == 42.0
     assert body["interval_80pct"] == pytest.approx([42.0 - 1.28 * 0.1, 42.0 + 1.28 * 0.1])
+
+
+def test_predict_mobility_rank(client):
+    resp = client.post("/predict-mobility-rank", json={})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["intergen_rank_correlation"] == 42.0
+    assert body["interval_80pct"] == pytest.approx([42.0 - 1.28 * 0.2, 42.0 + 1.28 * 0.2])
 
 
 def test_predict_income_group(client):
@@ -85,6 +98,15 @@ def test_explain_gini_503_when_no_explainer(client, monkeypatch, import_service_
 
     resp = client.post("/explain-gini", json={})
     assert resp.status_code == 503
+
+
+def test_explain_mobility_rank(client, monkeypatch, import_service_app):
+    predict_app = import_service_app("predict-api")
+    monkeypatch.setattr(predict_app, "explain", lambda name, X, **kw: {"gdp_per_capita_ppp": 0.2})
+
+    resp = client.post("/explain-mobility-rank", json={})
+    assert resp.status_code == 200
+    assert resp.json() == {"contributions": {"gdp_per_capita_ppp": 0.2}}
 
 
 def test_explain_income_group_reports_predicted_class(client, monkeypatch, import_service_app):

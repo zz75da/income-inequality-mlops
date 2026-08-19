@@ -109,6 +109,19 @@ stages:
     metrics:
       - data/artifacts/metrics_mobility.json
 
+  train_mobility_rank:
+    desc: "Random forest regressor -> intergen_rank_correlation (GDIM's rank-correlation mobility measure)"
+    cmd: python train-api/services/train_mobility_rank.py
+    deps:
+      - train-api/services/train_mobility_rank.py
+      - train-api/services/common.py
+      - data/processed/features.csv
+      - params.yaml
+    outs:
+      - data/artifacts/model_mobility_rank.pkl
+    metrics:
+      - data/artifacts/metrics_mobility_rank.json
+
   train_income_group:
     desc: "XGBoost classifier -> WB income_group (L/LM/UM/H), proxy for income bracket"
     cmd: python train-api/services/train_income_group.py

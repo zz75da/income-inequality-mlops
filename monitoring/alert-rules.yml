@@ -29,6 +29,11 @@ groups:
         labels: {severity: warning}
         annotations: {summary: "Mobility regressor R2 dropped below 0.15 on the last training run"}
 
+      - alert: MobilityRankModelR2Low
+        expr: model_final_r2{target="mobility_rank"} < 0.15
+        labels: {severity: warning}
+        annotations: {summary: "Mobility-rank regressor R2 dropped below 0.15 on the last training run"}
+
       - alert: IncomeGroupAccuracyLow
         expr: model_final_accuracy{target="income_group"} < 0.7
         labels: {severity: warning}

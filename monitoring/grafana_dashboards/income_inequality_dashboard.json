@@ -89,7 +89,7 @@
     {
       "type": "stat",
       "title": "Gini R² (gate: ≥ 0.4)",
-      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 13 },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 13 },
       "fieldConfig": {
         "defaults": {
           "thresholds": {
@@ -106,7 +106,7 @@
     {
       "type": "stat",
       "title": "Mobility R² (gate: ≥ 0.15)",
-      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 13 },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 13 },
       "fieldConfig": {
         "defaults": {
           "thresholds": {
@@ -122,8 +122,25 @@
     },
     {
       "type": "stat",
+      "title": "Mobility-rank R² (gate: ≥ 0.15)",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 13 },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 0.15 }
+            ]
+          }
+        }
+      },
+      "targets": [{ "expr": "model_final_r2{target=\"mobility_rank\"}" }]
+    },
+    {
+      "type": "stat",
       "title": "Income group accuracy (gate: ≥ 0.7)",
-      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 13 },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 13 },
       "fieldConfig": {
         "defaults": {
           "thresholds": {

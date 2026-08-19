@@ -8,8 +8,9 @@ Five pages (About first — landing page for a first-time visitor):
     time series, sourced straight from data/processed/features.csv (no API
     call needed — this is descriptive data, not a model prediction).
   - Predict: form -> calls predict-api's /predict-gini, /predict-mobility,
-    /predict-income-group with the entered macro features, showing formatted
-    results with confidence intervals and a SHAP "why this prediction" panel.
+    /predict-mobility-rank, /predict-income-group with the entered macro
+    features, showing formatted results with confidence intervals and a
+    SHAP "why this prediction" panel.
   - Model Performance: reads data/artifacts/metrics_*.json + params.yaml +
     registry_status.json directly (no predict-api call) — stays functional
     even if predict-api is down.
@@ -100,6 +101,7 @@ SHAP_NEGATIVE = "#4C78A8"  # pushes the prediction down
 TARGETS = {
     "gini": {"label": "Gini index", "metric_label": "R²", "metric_key": "r2"},
     "mobility": {"label": "Mobility (intergen. elasticity)", "metric_label": "R²", "metric_key": "r2"},
+    "mobility_rank": {"label": "Mobility (intergen. rank correlation)", "metric_label": "R²", "metric_key": "r2"},
     "income_group": {"label": "Income group", "metric_label": "Accuracy", "metric_key": "accuracy"},
 }
 
@@ -377,7 +379,7 @@ def page_predict() -> None:
         income_group_lag1=income_group_lag1,
     )
 
-    if not st.button("Predict all 3 targets", type="primary"):
+    if not st.button("Predict all 4 targets", type="primary"):
         return
 
     targets = [
@@ -389,10 +391,17 @@ def page_predict() -> None:
             "/explain-mobility",
             "intergen_income_elasticity",
         ),
+        (
+            "mobility_rank",
+            "Mobility (rank correlation)",
+            "/predict-mobility-rank",
+            "/explain-mobility-rank",
+            "intergen_rank_correlation",
+        ),
         ("income_group", "Income group", "/predict-income-group", "/explain-income-group", None),
     ]
 
-    cols = st.columns(3)
+    cols = st.columns(4)
     for col, (_name, label, predict_ep, explain_ep, value_key) in zip(cols, targets, strict=False):
         with col:
             try:
@@ -516,16 +525,16 @@ has exactly the same income; 100 would mean one person has all of it. Real count
 between roughly 25 (e.g. several Nordic countries) and 63 (some of the most unequal economies) —
 so a few points of difference is meaningful, not noise.
 
-**Model quality here — R² 0.565, MAE 5.34:**
+**Model quality here — R² 0.614, MAE 4.81:**
 - **R² (coefficient of determination)** is the share of country-to-country variation in Gini the
   model explains from macro features (GDP per capita, unemployment, urbanization, tax/social
   spending, etc.) — 1.0 would be a perfect fit, 0 would mean "no better than always guessing the
-  average." **0.565 means the model explains about 56% of why some countries are more unequal than
-  others.** The other 44% comes from things this dataset doesn't capture — labor law, union
+  average." **0.614 means the model explains about 61% of why some countries are more unequal than
+  others.** The other 39% comes from things this dataset doesn't capture — labor law, union
   density, informal-sector size, historical land distribution — so treat predictions as a
   macro-driven estimate, not the full picture.
 - **MAE (mean absolute error)** is the average miss size, in actual Gini points: **a typical
-  prediction is off by about 5.3 points.** For context, that's roughly the gap between France and
+  prediction is off by about 4.8 points.** For context, that's roughly the gap between France and
   the UK's Gini index — real, but not the difference between an equal and an unequal society.
 """
         )
@@ -536,18 +545,41 @@ so a few points of difference is meaningful, not noise.
 **What it measures:** how strongly a child's income is tied to their parents' income, on roughly a
 0-1 scale. **Lower = more mobility** (your income is less determined by your parents' — e.g.
 Nordic countries cluster near 0.15-0.2). **Higher = less mobility** (income is more inherited —
-several countries with high inequality sit above 0.4-0.5). This is the least intuitive of the
-three targets and the one where "good" performance looks different from a typical regression.
+several countries with high inequality sit above 0.4-0.5). This is one of the least intuitive
+targets and one where "good" performance looks different from a typical regression.
 
-**Model quality here — R² 0.350, MAE 0.102:**
+**Model quality here — R² 0.358, MAE 0.102:**
 - The elasticity itself only spans a narrow real-world range (roughly 0.1-0.6), so even a model
   that's doing genuinely useful work will show a lower R² than Gini's — there's simply less
   variance available to explain, and this metric is sparser and noisier in the source data (GDIM)
-  to begin with. **0.35 in this context is a meaningfully-better-than-average fit, not a weak one**
-  — read it relative to this target's ceiling, not against Gini's 0.565.
+  to begin with. **0.36 in this context is a meaningfully-better-than-average fit, not a weak one**
+  — read it relative to this target's ceiling, not against Gini's 0.614.
 - **MAE 0.102** means a typical prediction is off by about 0.1 elasticity points — on a 0.1-0.6
   scale, enough to blur adjacent countries but still usually correct about which broad tier
   (low/medium/high mobility) a country falls into.
+"""
+        )
+
+    with st.expander("Mobility (intergenerational rank correlation) — what it measures and how good the model is"):
+        st.markdown(
+            """
+**What it measures:** GDIM's second mobility statistic, alongside the elasticity above — instead
+of how strongly a child's *income level* tracks their parents', this is how strongly a child's
+*rank* in the income distribution does (a child born to top-decile parents ending up top-decile
+themselves, regardless of the absolute income gap between generations). Same 0-1 scale, same
+"lower = more mobile" direction, but a statistically distinct question — enough that the two
+targets are trained as separate models rather than two heads on one script.
+
+**Model quality here — R² -0.095, MAE 0.091:** unlike the other three targets, this one **does not
+clear its promotion gate** (≥ 0.15) and sits in `Staging`, not `Production` — worth explaining
+plainly rather than glossing over. A negative R² means the model's predictions are *worse* than
+simply guessing the training set's average rank-correlation for every country: the macro feature
+set (GDP, unemployment, spending ratios, etc.) that works reasonably for the income elasticity
+above carries essentially no usable signal for this specific statistic, at least not for a plain
+Random Forest with no further feature engineering. **This is the promotion gate doing its job** —
+correctly declining to serve an underperforming model as if it were reliable, the same mechanism
+that gates every target here, not a special case bolted on for this one. See [Known
+Limitations](https://github.com/zz75da/income-inequality-mlops#known-limitations) for more.
 """
         )
 
@@ -559,15 +591,15 @@ falls into (Low / Lower-middle / Upper-middle / High income), based on gross nat
 capita. Unlike Gini or mobility, there's no partial credit for "close": the model is either right
 or wrong about the bracket.
 
-**Model quality here — Accuracy 0.992, Macro F1 0.991:**
-- **Accuracy** is simply the fraction of correct predictions — 99.2% here. That number alone can be
+**Model quality here — Accuracy 0.991, Macro F1 0.991:**
+- **Accuracy** is simply the fraction of correct predictions — 99.1% here. That number alone can be
   misleading on an imbalanced dataset (if most rows were "High income," always guessing "High
   income" would already score well without learning anything).
 - **Macro F1** guards against exactly that: it averages the F1 score (precision/recall balance)
   **per class, unweighted**, so a model that ignores a rare class gets penalized even if overall
   accuracy stays high. **0.991 essentially matching accuracy means the model isn't leaning on the
   common classes — it's genuinely distinguishing all four brackets,** not just the easy ones. This
-  is the most reliable of the three targets, which makes sense: GNI-per-capita brackets are a
+  is the most reliable of the four targets, which makes sense: GNI-per-capita brackets are a
   close functional match for the GDP-per-capita feature already in the training data.
 """
         )

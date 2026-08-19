@@ -59,13 +59,17 @@ clears its MLflow registry promotion gate (`params.yaml`'s `promotion_gates`, mi
 |---|---|---|---|---|
 | Gini index | R² | 0.614 | ≥ 0.4 | ✅ Production |
 | Mobility (intergen. elasticity) | R² | 0.358 | ≥ 0.15 | ✅ Production |
+| Mobility (intergen. rank correlation) | R² | -0.095 | ≥ 0.15 | 🟡 Staging |
 | Income group | Accuracy | 0.991 | ≥ 0.7 | ✅ Production |
 
-All three currently clear their gates and are registered as `Production` versions on DagsHub's
-MLflow registry — but the gate is real, not decorative: a model that doesn't clear its threshold
-stays in `Staging` (still trained, logged, and registered — just not served as the "current"
-version) rather than being rubber-stamped into production. See the Streamlit app's Model
-Performance page for live status, or `GET /models/registry-status` on predict-api.
+Three of the four currently clear their gates and are registered as `Production` versions on
+DagsHub's MLflow registry — but the gate is real, not decorative: a model that doesn't clear its
+threshold stays in `Staging` (still trained, logged, and registered — just not served as the
+"current" version) rather than being rubber-stamped into production. The rank-correlation mobility
+model is exactly that case: its negative R² means it performs *worse* than predicting the training
+average for every country, and the gate correctly keeps it out of Production rather than serving
+it as if it were reliable — see [Challenges Solved](#challenges-solved). See the Streamlit app's
+Model Performance page for live status, or `GET /models/registry-status` on predict-api.
 
 ![DagsHub Model Registry — three registered models](docs/img/dagshub_registry.png)
 
@@ -81,17 +85,21 @@ interval plus a live SHAP breakdown of which features pushed it up or down (from
 
 ## Prediction Targets
 
-Three models, trained from the same country-year feature panel:
+Four models, trained from the same country-year feature panel:
 
 | Target | Type | Model | Column |
 |---|---|---|---|
 | Gini index | Regression | XGBoost | `gini_index` |
 | Intergenerational income mobility | Regression | Random Forest | `intergen_income_elasticity` |
+| Intergenerational rank-correlation mobility | Regression | Random Forest | `intergen_rank_correlation` |
 | Income-group bracket | Classification (4 classes) | XGBoost | `income_group` |
 
-The third target substitutes the World Bank's Low/Lower-middle/Upper-middle/High income
-classification for a genuine household income-bracket model — see
-[Known Limitations](#known-limitations) for why.
+The last two both come from GDIM (see Data Sources) — the elasticity measures how much a child's
+income tracks their parents' in absolute terms, the rank correlation measures how much their
+relative *position* in the income distribution does; different enough statistically to warrant
+separate models rather than one script producing two outputs. The income-group target substitutes
+the World Bank's Low/Lower-middle/Upper-middle/High income classification for a genuine household
+income-bracket model — see [Known Limitations](#known-limitations) for why.
 
 ## Data Sources
 
@@ -125,13 +133,13 @@ flowchart LR
     subgraph airflow_dag["Airflow — @monthly"]
         direction TB
         Ingest["ingestion/*.py\n+ merge_sources.py"] --> Features["build_features.py\n(pandera-validated)"]
-        Features --> Train["train_gini · train_mobility\ntrain_income_group"]
+        Features --> Train["train_gini · train_mobility\ntrain_mobility_rank · train_income_group"]
     end
 
     sources --> Ingest
     Train -->|"log + register"| MLflow[("MLflow Registry\non DagsHub")]
     MLflow -->|"gate passes ->\nProduction"| TrainAPI["train-api :5002"]
-    TrainAPI -->|"POST /reload-artifacts"| PredictAPI["predict-api :5003\ngini · mobility · income_group\n+ SHAP + drift buffer"]
+    TrainAPI -->|"POST /reload-artifacts"| PredictAPI["predict-api :5003\ngini · mobility · mobility_rank · income_group\n+ SHAP + drift buffer"]
     airflow_dag -.->|"POST /train, poll status"| TrainAPI
 
     PredictAPI --> Streamlit["Streamlit :8501\nExplore · Predict\nModel Performance · About"]
@@ -237,7 +245,7 @@ Or open `http://localhost:8080`, enable `income_inequality_pipeline`, and trigge
 ### train-api — Training
 
 ```
-POST /train              {"target": "gini|mobility|income_group|all", "run_ingestion": bool}
+POST /train              {"target": "gini|mobility|mobility_rank|income_group|all", "run_ingestion": bool}
                           -> 202 {"job_id": "...", "status": "running"} | 409 if busy
 GET  /train/status/{id}  -> {"status": "success|partial_success|running|failed", "log": [...]}
                           partial_success = some targets trained even though others failed
@@ -255,9 +263,11 @@ to `Production` if it clears `params.yaml`'s `promotion_gates` (otherwise `Stagi
 ```
 POST /predict-gini            {feature fields...} -> {"gini_index": float, "interval_80pct": [lo, hi]}
 POST /predict-mobility        {feature fields...} -> {"intergen_income_elasticity": float, "interval_80pct": [lo, hi]}
+POST /predict-mobility-rank   {feature fields...} -> {"intergen_rank_correlation": float, "interval_80pct": [lo, hi]}
 POST /predict-income-group    {feature fields...} -> {"income_group": str, "probabilities": {...}}
 POST /explain-gini            {feature fields...} -> {"contributions": {feature: shap_value, ...}}
 POST /explain-mobility        {feature fields...} -> {"contributions": {...}}
+POST /explain-mobility-rank   {feature fields...} -> {"contributions": {...}}
 POST /explain-income-group    {feature fields...} -> {"contributions": {...}, "explained_class": str}
 POST /reload-artifacts        (reload models after a training run)
 GET  /drift-status
@@ -302,9 +312,10 @@ income-inequality-mlops/
 │       │                             # register_and_promote() (registry + promotion gates)
 │       ├── train_gini.py
 │       ├── train_mobility.py
+│       ├── train_mobility_rank.py
 │       └── train_income_group.py
 ├── predict-api/
-│   ├── app.py                       # 3-model inference, SHAP explain, drift buffer
+│   ├── app.py                       # 4-model inference, SHAP explain, drift buffer
 │   └── services/
 │       ├── drift_monitor.py
 │       └── explain.py               # SHAP TreeExplainer wrapper
@@ -395,6 +406,14 @@ tutorial-perfect assumptions:
   Neither was ever used as a model feature or shown anywhere, so removed outright from
   `ingest_eurostat.py` rather than guessing at the right dimension filter blind. Gini (`ilc_di12`)
   doesn't have this problem — its response only ever carries one series per country-year.
+- **A 4th target that doesn't clear its own promotion gate — left that way on purpose.** GDIM
+  publishes two mobility statistics (income elasticity and rank correlation); the elasticity model
+  gets R²=0.358 from the same macro feature set that gets Gini to R²=0.614, but training the
+  rank-correlation target the same way gets **R²=-0.095** — worse than always predicting the
+  training average. Rather than lowering the gate to force a pass or quietly shipping a misleading
+  model, it stays registered in `Staging` exactly as the gate is designed to do — the same
+  mechanism that would catch a real regression on any of the other three targets, demonstrated
+  here on a target that genuinely doesn't clear the bar.
 
 ## Known Limitations
 

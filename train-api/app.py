@@ -3,12 +3,12 @@
 # MODULE SUMMARY
 # ------------------------------------------------------------
 # Role: FastAPI service that runs the ingestion -> feature ->
-# train pipeline for the three prediction targets (gini,
-# mobility, income_group) as background jobs: POST returns a
-# job_id immediately; poll GET /train/status/{id}.
+# train pipeline for the four prediction targets (gini,
+# mobility, mobility_rank, income_group) as background jobs:
+# POST returns a job_id immediately; poll GET /train/status/{id}.
 #
 # Endpoints:
-#   POST /train              {"target": "gini|mobility|income_group|all",
+#   POST /train              {"target": "gini|mobility|mobility_rank|income_group|all",
 #                              "run_ingestion": false}
 #                            -> 202 {"job_id": "...", "status": "running"} | 409 if busy
 #   GET  /train/status/{id}  -> {"status": "success|running|partial_success|failed", "log": [...]}
@@ -46,6 +46,7 @@ _ACTIVE_JOB: str | None = None
 TARGET_SCRIPTS = {
     "gini": SERVICES_DIR / "train_gini.py",
     "mobility": SERVICES_DIR / "train_mobility.py",
+    "mobility_rank": SERVICES_DIR / "train_mobility_rank.py",
     "income_group": SERVICES_DIR / "train_income_group.py",
 }
 INGEST_SCRIPTS = [
@@ -116,8 +117,10 @@ def _run_job(job_id: str, target: str, run_ingestion: bool) -> None:
 @app.post("/train", status_code=202)
 def train(request: TrainRequest):
     global _ACTIVE_JOB
-    if request.target not in {"gini", "mobility", "income_group", "all"}:
-        raise HTTPException(status_code=400, detail="target must be one of gini|mobility|income_group|all")
+    if request.target not in {"gini", "mobility", "mobility_rank", "income_group", "all"}:
+        raise HTTPException(
+            status_code=400, detail="target must be one of gini|mobility|mobility_rank|income_group|all"
+        )
 
     with JOBS_LOCK:
         if _ACTIVE_JOB is not None and JOBS.get(_ACTIVE_JOB, {}).get("status") == "running":

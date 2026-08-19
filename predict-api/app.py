@@ -2,19 +2,21 @@
 # ============================================================
 # MODULE SUMMARY
 # ------------------------------------------------------------
-# Role: FastAPI inference service. Loads the 3 trained models
-# (gini regressor, mobility regressor, income_group classifier)
-# plus the categorical encoding map produced by
-# features/build_features.py, and serves predictions from raw
-# JSON feature payloads (no need for callers to know about
-# pandas .cat.codes internals).
+# Role: FastAPI inference service. Loads the 4 trained models
+# (gini regressor, mobility regressor, mobility-rank regressor,
+# income_group classifier) plus the categorical encoding map
+# produced by features/build_features.py, and serves predictions
+# from raw JSON feature payloads (no need for callers to know
+# about pandas .cat.codes internals).
 #
 # Endpoints:
 #   POST /predict-gini            -> {"gini_index": float, "interval_80pct": [lo, hi]}
 #   POST /predict-mobility        -> {"intergen_income_elasticity": float, "interval_80pct": [lo, hi]}
+#   POST /predict-mobility-rank   -> {"intergen_rank_correlation": float, "interval_80pct": [lo, hi]}
 #   POST /predict-income-group    -> {"income_group": str, "probabilities": {...}}
 #   POST /explain-gini            -> {"contributions": {feature: shap_value, ...}}
 #   POST /explain-mobility        -> {"contributions": {feature: shap_value, ...}}
+#   POST /explain-mobility-rank   -> {"contributions": {feature: shap_value, ...}}
 #   POST /explain-income-group    -> {"contributions": {...}, "explained_class": str}
 #   POST /reload-artifacts        (reload models from disk after a training run)
 #   GET  /drift-status
@@ -105,13 +107,18 @@ def _try_dvc_pull_from_env() -> None:
     DAGSHUB_USER/DAGSHUB_TOKEN from the environment instead of st.secrets
     (this service has no Streamlit-style secrets manager). Best-effort and
     silent on failure — the existing per-model "not found" warnings already
-    cover that case. No-op when any model file already exists (the normal
-    docker-compose case), so this never runs an unnecessary dvc pull on
-    every /reload-artifacts call in local/dev use.
+    cover that case. No-op only when every expected model file already
+    exists (the normal docker-compose case, where data/ is volume-mounted
+    complete) — checking `all` rather than `any` matters the moment a new
+    target is added: on a host that already has the older 3 models cached,
+    `any(...)` would see one hit and skip the pull forever, so the new
+    target's model would never actually arrive.
     """
     import subprocess
 
-    if any((ARTIFACTS_DIR / f"model_{name}.pkl").exists() for name in ("gini", "mobility", "income_group")):
+    if all(
+        (ARTIFACTS_DIR / f"model_{name}.pkl").exists() for name in ("gini", "mobility", "mobility_rank", "income_group")
+    ):
         return
     user = os.getenv("DAGSHUB_USER")
     token = os.getenv("DAGSHUB_TOKEN")
@@ -156,7 +163,7 @@ def load_artifacts() -> None:
     _try_dvc_pull_from_env()
     _models = {}
     _metrics = {}
-    for name in ("gini", "mobility", "income_group"):
+    for name in ("gini", "mobility", "mobility_rank", "income_group"):
         path = ARTIFACTS_DIR / f"model_{name}.pkl"
         if path.exists():
             with open(path, "rb") as f:
@@ -243,6 +250,18 @@ def predict_mobility(payload: FeaturePayload):
     return {"intergen_income_elasticity": pred, "interval_80pct": _interval_80pct("mobility", pred)}
 
 
+@app.post("/predict-mobility-rank")
+def predict_mobility_rank(payload: FeaturePayload):
+    if "mobility_rank" not in _models:
+        raise HTTPException(status_code=503, detail="model_mobility_rank.pkl not loaded — train it first")
+    with PREDICTION_LATENCY.labels(target="mobility_rank").time():
+        X = _build_feature_row(payload)
+        pred = float(_models["mobility_rank"].predict(X)[0])
+        record_prediction(X.iloc[0].to_dict())
+    PREDICTION_COUNT.labels(target="mobility_rank").inc()
+    return {"intergen_rank_correlation": pred, "interval_80pct": _interval_80pct("mobility_rank", pred)}
+
+
 @app.post("/predict-income-group")
 def predict_income_group(payload: FeaturePayload):
     if "income_group" not in _models:
@@ -280,6 +299,17 @@ def explain_mobility(payload: FeaturePayload):
     contributions = explain("mobility", X)
     if contributions is None:
         raise HTTPException(status_code=503, detail="No SHAP explainer available for mobility")
+    return {"contributions": contributions}
+
+
+@app.post("/explain-mobility-rank")
+def explain_mobility_rank(payload: FeaturePayload):
+    if "mobility_rank" not in _models:
+        raise HTTPException(status_code=503, detail="model_mobility_rank.pkl not loaded — train it first")
+    X = _build_feature_row(payload)
+    contributions = explain("mobility_rank", X)
+    if contributions is None:
+        raise HTTPException(status_code=503, detail="No SHAP explainer available for mobility_rank")
     return {"contributions": contributions}
 
 
@@ -357,9 +387,11 @@ def root():
         "endpoints": [
             "/predict-gini",
             "/predict-mobility",
+            "/predict-mobility-rank",
             "/predict-income-group",
             "/explain-gini",
             "/explain-mobility",
+            "/explain-mobility-rank",
             "/explain-income-group",
             "/reload-artifacts",
             "/drift-status",

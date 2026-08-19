@@ -47,6 +47,11 @@ def test_train_starts_job_and_reports_status(client):
     assert status_resp.json()["status"] == "success"
 
 
+def test_train_accepts_mobility_rank_target(client):
+    resp = client.post("/train", json={"target": "mobility_rank", "run_ingestion": False})
+    assert resp.status_code == 202
+
+
 def test_train_status_unknown_job(client):
     resp = client.get("/train/status/does-not-exist")
     assert resp.status_code == 404

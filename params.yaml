@@ -30,6 +30,7 @@ features:
     - income_group_lag1       # previous year's WB income group, as a feature (not the classification target)
   target_gini: gini_index                    # World Bank / OECD SI.POV.GINI, regression
   target_mobility: intergen_income_elasticity # WID/GDIM-derived, regression
+  target_mobility_rank: intergen_rank_correlation # GDIM's rank-correlation mobility measure, regression
   target_income_group: income_group           # World Bank classification (L / LM / UM / H), classification
 
 split:
@@ -48,6 +49,12 @@ model_gini:
   reg_lambda: 1.0
 
 model_mobility:
+  algorithm: random_forest_regressor
+  n_estimators: 500
+  max_depth: 8
+  min_samples_leaf: 3
+
+model_mobility_rank:
   algorithm: random_forest_regressor
   n_estimators: 500
   max_depth: 8
@@ -76,6 +83,9 @@ promotion_gates:
     metric: r2
     min: 0.4
   mobility:
+    metric: r2
+    min: 0.15
+  mobility_rank:
     metric: r2
     min: 0.15
   income_group:
