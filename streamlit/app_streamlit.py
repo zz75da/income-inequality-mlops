@@ -43,32 +43,35 @@ import streamlit.components.v1 as components
 st.set_page_config(page_title="Income Inequality MLOps", layout="wide", page_icon="📊")
 
 
-# The two paths Streamlit itself checks for a secrets file (confirmed from
-# its own "No secrets files found" message) — probed directly so _config()
-# below can skip st.secrets entirely when neither exists. st.secrets doesn't
-# raise when the file is missing (a try/except can't catch it); it renders a
-# "No secrets files found" warning banner into the app as a side effect of
-# the lazy-load on first access, once per _config() call — which is exactly
-# what showed up 4 times on a local run with no secrets.toml.
-_SECRETS_PATHS = (
-    Path.home() / ".streamlit" / "secrets.toml",
-    Path(__file__).resolve().parent / ".streamlit" / "secrets.toml",
-)
-
-
 def _config(key: str, default: str) -> str:
-    """Read a config value from Streamlit Cloud's secrets manager first (its
-    Secrets UI populates st.secrets, not necessarily plain OS environment
-    variables), falling back to a real env var (docker-compose/local run),
-    then the given default."""
-    if any(p.exists() for p in _SECRETS_PATHS):
-        try:
-            value = st.secrets.get(key)
-            if value:
-                return value
-        except Exception:
-            pass
-    return os.getenv(key, default)
+    """Read a config value from a real OS environment variable first (the
+    normal docker-compose case — see docker-compose.yml's streamlit service,
+    which sets PREDICT_API_URL directly), falling back to Streamlit Cloud's
+    secrets manager (its Secrets UI populates st.secrets, not plain OS env
+    vars) if no env var is set, then the given default.
+
+    Checking os.getenv() first isn't just an ordering nicety — an earlier
+    version of this function pre-checked whether a secrets.toml file existed
+    at either of the two paths Streamlit's self-hosted default search uses,
+    to avoid a "No secrets files found" banner appearing locally, and only
+    attempted st.secrets if one did. That backfired hard on Streamlit
+    Community Cloud: it doesn't write a literal secrets.toml to either path
+    (confirmed live — the deployed app reported "no secrets.toml found" even
+    though DAGSHUB_USER/DAGSHUB_TOKEN were genuinely configured in its
+    Secrets panel), so the pre-check silently skipped st.secrets — and this
+    entire config lookup — on the one platform it most needed to work on.
+    Never gate st.secrets access on a file-existence guess again; checking
+    the cheap, side-effect-free os.getenv() first makes the gate moot."""
+    env_value = os.getenv(key)
+    if env_value:
+        return env_value
+    try:
+        value = st.secrets.get(key)
+        if value:
+            return value
+    except Exception:
+        pass
+    return default
 
 
 PREDICT_API_URL = _config("PREDICT_API_URL", "http://localhost:5003")
@@ -114,8 +117,10 @@ def _try_dvc_pull_from_secrets() -> str:
     secrets manager, attempt a `dvc pull` before giving up.
 
     Returns a short human-readable outcome string instead of failing purely
-    silently — the two hosted-deploy bugs found in this bootstrap so far
-    (missing `git init`, and this one) were both invisible in the app itself,
+    silently — hosted-deploy bugs found in this bootstrap so far (missing
+    `git init`; and a file-existence pre-check that incorrectly assumed
+    Streamlit Community Cloud writes a literal secrets.toml file, which it
+    doesn't — see _config()'s docstring) were invisible in the app itself,
     only visible in a platform log the user had to go dig up. Callers show
     this in the UI so a repeat failure is diagnosable from the app directly.
     `@st.cache_resource` (not `@st.cache_data` — this isn't picklable-data,
@@ -124,8 +129,6 @@ def _try_dvc_pull_from_secrets() -> str:
     """
     import subprocess
 
-    if not any(p.exists() for p in _SECRETS_PATHS):
-        return "no secrets.toml found on this host — st.secrets was never touched"
     try:
         user = st.secrets.get("DAGSHUB_USER")
         token = st.secrets.get("DAGSHUB_TOKEN")
